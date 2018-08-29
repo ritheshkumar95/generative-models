@@ -43,7 +43,7 @@ class MLP_Discriminator(nn.Module):
             nn.ReLU(True),
             nn.Linear(dim, dim),
             nn.ReLU(True),
-            nn.Linear(dim, 1) 
+            nn.Linear(dim, 1)
         )
 
     def forward(self, z):

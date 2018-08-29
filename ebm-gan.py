@@ -5,7 +5,7 @@ import argparse
 import torch
 import torch.nn as nn
 
-from modules import MLP_Generator, MLP_Discriminator, MLP_Classifier
+from modules import MLP_Generator, MLP_Discriminator, MLP_Classifier, calc_gradient_penalty
 from data import inf_train_gen
 
 
@@ -95,7 +95,7 @@ for iters in range(args.iters):
 
     logits = netD(concat_x_z)
     dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    (1000 * dim_estimate).backward()
+    dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
@@ -118,6 +118,11 @@ for iters in range(args.iters):
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()
         D_fake.backward(mone)
+
+        gradient_penalty = calc_gradient_penalty(
+            netE, x_real.data, x_fake.data
+        )
+        gradient_penalty.backward()
 
         optimizerE.step()
         d_costs.append(

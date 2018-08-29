@@ -17,8 +17,8 @@ def sample(netG, n_points=10 ** 3):
 
 
 def visualize_energy(netE, n_points=100):
-    x = np.linspace(-1, 1, n_points)
-    y = np.linspace(-1, 1, n_points)
+    x = np.linspace(-2, 2, n_points)
+    y = np.linspace(-2, 2, n_points)
     grid = np.asarray(np.meshgrid(x, y)).transpose(1, 2, 0).reshape((-1, 2))
     grid = torch.from_numpy(grid).float().cuda()
     energies = netE(grid).detach().cpu().numpy()
