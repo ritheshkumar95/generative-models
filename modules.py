@@ -70,3 +70,25 @@ class Discriminator(nn.Module):
         out = out.view(-1, 4 * 4 * 4 * self.dim)
         out = self.output(out)
         return out.view(-1)
+
+
+class Classifier(nn.Module):
+    def __init__(self, dim=64):
+        super(Classifier, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(1, dim, 5, stride=2, padding=2),
+            nn.ReLU(True),
+            nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
+            nn.ReLU(True),
+            nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
+            nn.ReLU(True),
+        )
+        self.output = nn.Linear(4 * 4 * 4 * dim, 1)
+        self.dim = dim
+
+    def forward(self, input):
+        # input = input.view(-1, 1, 28, 28)
+        out = self.main(input)
+        out = out.view(-1, 4 * 4 * 4 * self.dim)
+        out = self.output(out)
+        return out.view(-1)
