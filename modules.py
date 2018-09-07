@@ -1,94 +1,116 @@
-import torch
+from collections import deque
+import random
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Categorical
 
 
-def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
-    alpha = torch.rand_like(real_data)
-    interpolates = alpha * real_data + (1 - alpha) * fake_data
-    interpolates.requires_grad_(True)
-    disc_interpolates = netD(interpolates)
-    gradients = torch.autograd.grad(
-        outputs=disc_interpolates, inputs=interpolates,
-        grad_outputs=torch.ones_like(disc_interpolates),
-        create_graph=True, retain_graph=True, only_inputs=True
-    )[0]
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * lamda
-    return gradient_penalty
+class ExperienceReplay(object):
+    def __init__(self, size):
+        self.buffer_size = size
+        self.len = 0
+
+        # Create buffers for (s_t, a_t, r_t, s_t+1, term)
+        self.buffer = deque(maxlen=self.buffer_size)
+
+    def sample(self, count):
+        count = min(count, self.len)
+        states = random.sample(self.buffer, count)
+        return states
+
+    def add(self, s_t):
+        self.len += 1
+        if self.len > self.buffer_size:
+            self.len = self.buffer_size
+        self.buffer.append(s_t)
 
 
-class Generator(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
-        super(Generator, self).__init__()
-        self.preprocess = nn.Sequential(
-            nn.Linear(z_dim, 4 * 4 * 4 * dim),
-            nn.BatchNorm1d(4 * 4 * 4 * dim),
-            nn.ReLU(True),
-        )
-        self.block1 = nn.Sequential(
-            nn.ConvTranspose2d(4 * dim, 2 * dim, 5),
-            nn.BatchNorm2d(2 * dim),
-            nn.ReLU(True)
-        )
-        self.block2 = nn.Sequential(
-            nn.ConvTranspose2d(2 * dim, dim, 5),
-            nn.BatchNorm2d(dim),
-            nn.ReLU(True),
-        )
-        self.deconv_out = nn.Sequential(
-            nn.ConvTranspose2d(dim, 1, 8, stride=2),
-            nn.Sigmoid()
-        )
-        self.dim = dim
+class PolicyWithValueFn(nn.Module):
+    def __init__(self, n_input, n_actions, dim):
+        super().__init__()
+        self.affine1 = nn.Linear(n_input, dim)
+        self.affine2 = nn.Linear(dim, n_actions)
+        self.affine3 = nn.Linear(dim, 1)
 
-    def forward(self, input):
-        output = self.preprocess(input)
-        output = output.view(-1, 4 * self.dim, 4, 4)
-        output = self.block1(output)
-        output = output[:, :, :7, :7]
-        output = self.block2(output)
-        output = self.deconv_out(output)
-        return output
+    def forward(self, x):
+        x = F.relu(self.affine1(x))
+        action_scores = self.affine2(x)
+        value = self.affine3(x)
+        return F.softmax(action_scores, dim=-1), value
+
+    def select_action(self, s_t):
+        action_probs, value = self.forward(s_t)
+        dist = Categorical(action_probs)
+        a_t = dist.sample()
+        log_prob = dist.log_prob(a_t)
+        return value, log_prob, a_t.item()
 
 
-class Discriminator(nn.Module):
-    def __init__(self, dim=64):
-        super(Discriminator, self).__init__()
+class Policy(nn.Module):
+    def __init__(self, n_input=4, n_actions=2, dim=128):
+        super(Policy, self).__init__()
+        self.affine1 = nn.Linear(n_input, dim)
+        self.affine2 = nn.Linear(dim, n_actions)
+
+    def forward(self, x):
+        x = F.relu(self.affine1(x))
+        action_scores = self.affine2(x)
+        return F.softmax(action_scores, dim=-1)
+
+    def select_action(self, s_t):
+        action_probs = self.forward(s_t)
+        dist = Categorical(action_probs)
+        a_t = dist.sample()
+        log_prob = dist.log_prob(a_t)
+        return log_prob, a_t.item()
+
+
+class MLP_Generator(nn.Module):
+    def __init__(self, output_dim, z_dim, dim):
+        super().__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 5, stride=2, padding=2),
+            nn.Linear(z_dim, dim),
             nn.ReLU(True),
-            nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
+            nn.Linear(dim, dim),
             nn.ReLU(True),
-            nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
+            nn.Linear(dim, dim),
             nn.ReLU(True),
+            nn.Linear(dim, output_dim)
         )
-        self.output = nn.Linear(4 * 4 * 4 * dim, 1)
-        self.dim = dim
 
-    def forward(self, input):
-        # input = input.view(-1, 1, 28, 28)
-        out = self.main(input)
-        out = out.view(-1, 4 * 4 * 4 * self.dim)
-        out = self.output(out)
-        return out.view(-1)
+    def forward(self, z):
+        return self.main(z)
 
 
-class Classifier(nn.Module):
-    def __init__(self, dim=64):
-        super(Classifier, self).__init__()
+class MLP_Discriminator(nn.Module):
+    def __init__(self, input_dim, dim):
+        super().__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 5, stride=2, padding=2),
+            nn.Linear(input_dim, dim),
             nn.ReLU(True),
-            nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
+            nn.Linear(dim, dim),
             nn.ReLU(True),
-            nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
+            nn.Linear(dim, dim),
             nn.ReLU(True),
+            nn.Linear(dim, 1)
         )
-        self.output = nn.Linear(4 * 4 * 4 * dim, 1)
-        self.dim = dim
 
-    def forward(self, input):
-        # input = input.view(-1, 1, 28, 28)
-        out = self.main(input)
-        out = out.view(-1, 4 * 4 * 4 * self.dim)
-        out = self.output(out)
-        return out.view(-1)
+    def forward(self, z):
+        return self.main(z)
+
+
+class MLP_Classifier(nn.Module):
+    def __init__(self, input_dim, z_dim, dim):
+        super().__init__()
+        self.main = nn.Sequential(
+            nn.Linear(input_dim + z_dim, dim),
+            nn.ReLU(True),
+            nn.Linear(dim, dim),
+            nn.ReLU(True),
+            nn.Linear(dim, dim),
+            nn.ReLU(True),
+            nn.Linear(dim, 1)
+        )
+
+    def forward(self, x):
+        return self.main(x)
