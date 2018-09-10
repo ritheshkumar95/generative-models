@@ -119,10 +119,10 @@ for iters in range(args.iters):
         D_fake = D_fake.mean()
         D_fake.backward(mone)
 
-        gradient_penalty = calc_gradient_penalty(
-            netE, x_real.data, x_fake.data
-        )
-        gradient_penalty.backward()
+        # gradient_penalty = calc_gradient_penalty(
+        #     netE, x_real.data, x_fake.data
+        # )
+        # gradient_penalty.backward()
 
         optimizerE.step()
         d_costs.append(
