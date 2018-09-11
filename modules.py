@@ -16,23 +16,31 @@ def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
     return gradient_penalty
 
 
+def calc_reconstruction(netE, data, sigma):
+    data.requires_grad_(True)
+    energy = netE(data)
+    score = torch.autograd.grad(
+        outputs=energy, inputs=data,
+        grad_outputs=torch.ones_like(energy),
+        create_graph=True, retain_graph=True, only_inputs=True
+    )[0]
+    return data - (sigma ** 2) * score
+
+
 class Generator(nn.Module):
     def __init__(self, z_dim=128, dim=64):
         super(Generator, self).__init__()
         self.preprocess = nn.Sequential(
             nn.Linear(z_dim, 4 * 4 * 4 * dim),
-            nn.BatchNorm1d(4 * 4 * 4 * dim),
-            nn.ReLU(True),
+            nn.ReLU(True)
         )
         self.block1 = nn.Sequential(
             nn.ConvTranspose2d(4 * dim, 2 * dim, 5),
-            nn.BatchNorm2d(2 * dim),
             nn.ReLU(True)
         )
         self.block2 = nn.Sequential(
             nn.ConvTranspose2d(2 * dim, dim, 5),
-            nn.BatchNorm2d(dim),
-            nn.ReLU(True),
+            nn.ReLU(True)
         )
         self.deconv_out = nn.Sequential(
             nn.ConvTranspose2d(dim, 1, 8, stride=2),
@@ -59,13 +67,12 @@ class Discriminator(nn.Module):
             nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
             nn.ReLU(True),
             nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
+            nn.ReLU(True)
         )
         self.output = nn.Linear(4 * 4 * 4 * dim, 1)
         self.dim = dim
 
     def forward(self, input):
-        # input = input.view(-1, 1, 28, 28)
         out = self.main(input)
         out = out.view(-1, 4 * 4 * 4 * self.dim)
         out = self.output(out)
@@ -73,7 +80,7 @@ class Discriminator(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, dim=64):
+    def __init__(self, z_dim=128, dim=64):
         super(Classifier, self).__init__()
         self.main = nn.Sequential(
             nn.Conv2d(1, dim, 5, stride=2, padding=2),
@@ -81,14 +88,39 @@ class Classifier(nn.Module):
             nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
             nn.ReLU(True),
             nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
+            nn.ReLU(True)
         )
-        self.output = nn.Linear(4 * 4 * 4 * dim, 1)
+        self.mlp1 = nn.Sequential(
+            nn.Linear(4 * 4 * 4 * dim, z_dim),
+            nn.ReLU(True)
+        )
+        self.mlp2 = nn.Sequential(
+            nn.Linear(z_dim * 2, dim),
+            nn.ReLU(True),
+            nn.Linear(dim, 1)
+        )
         self.dim = dim
 
-    def forward(self, input):
-        # input = input.view(-1, 1, 28, 28)
-        out = self.main(input)
+    def forward(self, x, z):
+        out = self.main(x)
         out = out.view(-1, 4 * 4 * 4 * self.dim)
-        out = self.output(out)
-        return out.view(-1)
+        out = self.mlp1(out)
+        out = torch.cat([out, z], -1)
+        return self.mlp2(out)
+
+
+if __name__ == '__main__':
+    # netD = Discriminator().cuda()
+    # print(netD(torch.randn(64, 1, 28, 28).cuda()).size())
+    netG = Generator().cuda()
+    netD = Discriminator().cuda()
+    netC = Classifier().cuda()
+
+    z = torch.randn(64, 128).cuda()
+    x = netG(z)
+    logits = netD(x)
+    mi = netC(x, z.squeeze())
+
+    print(x.shape)
+    print(logits.shape)
+    print(mi.shape)

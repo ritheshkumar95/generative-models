@@ -12,7 +12,7 @@ from data import inf_train_gen
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples.png', nrow=8, normalize=True)
+    save_image(x_fake, 'samples/wgan-gp_%s.png' % args.dataset)
 
 
 def parse_args():
@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--dataset', required=True)
 
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=200000)
+    parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--lamda', type=float, default=10)
 
@@ -37,21 +37,21 @@ itr = inf_train_gen(args.dataset, args.batch_size)
 # Dump Original Data
 #####################
 orig_data = inf_train_gen(args.dataset, args.batch_size).__next__()
-save_image(orig_data, 'orig_images.png', nrow=8, normalize=True)
+save_image(orig_data, 'samples/orig_%s.png' % args.dataset)
 
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
 
-for iters in range(args.iters):
-    wass_dist = []
-    g_costs = []
-
+wass_dist = []
+d_costs = []
+start_time = time.time()
+for iters in range(1, args.iters + 1):
     netG.zero_grad()
     z = torch.randn(args.batch_size, args.z_dim).cuda()
     x_fake = netG(z)
@@ -60,12 +60,10 @@ for iters in range(args.iters):
     D_fake.backward(mone)
     G_cost = -D_fake
     optimizerG.step()
-    g_costs.append(G_cost.item())
 
     for i in range(args.critic_iters):
         x_real = itr.__next__().cuda()
 
-        start_time = time.time()
         netD.zero_grad()
         D_real = netD(x_real)
         D_real = D_real.mean()
@@ -86,16 +84,20 @@ for iters in range(args.iters):
 
         Wasserstein_D = D_real - D_fake
         optimizerD.step()
+
         wass_dist.append(Wasserstein_D.item())
+        d_costs.append([D_real.item(), D_fake.item()])
 
-    if iters % 50 == 0:
+    if iters % 500 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
-              'Wass_D: {:5.3f} G_cost: {:5.3f} Time: {:5.3f}'.format(
+              'Wass_D: {:5.3f} D_costs: {} Time: {:5.3f}'.format(
                iters, args.iters,
-               (100. * iters) / args.iters,
-               np.mean(wass_dist), np.mean(g_costs),
-               time.time() - start_time
+               (500. * iters) / args.iters,
+               np.mean(wass_dist), np.asarray(d_costs).mean(0),
+               (time.time() - start_time) / 500
               ))
-        start_time = time.time()
-
         sample(netG)
+        torch.save(netG.state_dict(), 'models/wgan-gp_%s.pt' % args.dataset)
+        g_costs = []
+        wass_dist = []
+        start_time = time.time()

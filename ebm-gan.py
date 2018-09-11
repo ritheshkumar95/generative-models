@@ -3,16 +3,21 @@ import time
 import argparse
 
 import torch
+import torch.nn as nn
 from torchvision.utils import save_image
 
-from modules import Generator, Discriminator, calc_gradient_penalty
+from modules import Generator, Discriminator, Classifier
+from modules import calc_reconstruction
 from data import inf_train_gen
 
 
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples.png', nrow=8, normalize=True)
+    save_image(
+        x_fake, 'samples/ebm_%s.png' % args.dataset,
+        nrow=8, normalize=True
+    )
 
 
 def parse_args():
@@ -20,9 +25,10 @@ def parse_args():
     parser.add_argument('--dataset', required=True)
 
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=200000)
+    parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--lamda', type=float, default=10)
+    parser.add_argument('--sigma', type=float, default=.05)
+    parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=64)
@@ -37,65 +43,90 @@ itr = inf_train_gen(args.dataset, args.batch_size)
 # Dump Original Data
 #####################
 orig_data = inf_train_gen(args.dataset, args.batch_size).__next__()
-save_image(orig_data, 'orig_images.png', nrow=8, normalize=True)
+save_image(
+    orig_data, 'samples/orig_%s.png' % args.dataset,
+    nrow=8, normalize=True
+)
 
 netG = Generator(args.z_dim, args.dim).cuda()
-netD = Discriminator(args.dim).cuda()
+netE = Discriminator(args.dim).cuda()
+netD = Classifier(args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
 
-for iters in range(args.iters):
-    wass_dist = []
-    g_costs = []
+label = torch.ones(2 * args.batch_size).float().cuda()
+label[args.batch_size:].zero_()
 
+start_time = time.time()
+d_costs = []
+g_costs = []
+for iters in range(args.iters):
     netG.zero_grad()
+    netD.zero_grad()
+
     z = torch.randn(args.batch_size, args.z_dim).cuda()
     x_fake = netG(z)
-    D_fake = netD(x_fake)
+    D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    D_fake.backward(mone)
-    G_cost = -D_fake
+    D_fake.backward(one, retain_graph=True)
+
+    z_bar = z.clone()[torch.randperm(z.size(0))]
+    concat_x = torch.cat([x_fake, x_fake], 0)
+    concat_z = torch.cat([z, z_bar], 0)
+
+    logits = netD(concat_x, concat_z)
+    dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
+    dim_estimate.backward()
+
     optimizerG.step()
-    g_costs.append(G_cost.item())
+    optimizerD.step()
+
+    g_costs.append(
+        [D_fake.item(), dim_estimate.item()]
+    )
 
     for i in range(args.critic_iters):
         x_real = itr.__next__().cuda()
 
-        start_time = time.time()
-        netD.zero_grad()
-        D_real = netD(x_real)
+        netE.zero_grad()
+        D_real = netE(x_real)
         D_real = D_real.mean()
-        D_real.backward(mone)
+        D_real.backward(one)
 
         # train with fake
         z = torch.randn(args.batch_size, args.z_dim).cuda()
         x_fake = netG(z).detach()
-        D_fake = netD(x_fake)
+        D_fake = netE(x_fake)
         D_fake = D_fake.mean()
-        D_fake.backward(one)
+        D_fake.backward(mone)
 
-        # train with gradient penalty
-        gradient_penalty = calc_gradient_penalty(
-            netD, x_real.data, x_fake.data, lamda=args.lamda
+        data = torch.cat([x_real, x_fake], 0)
+        score_matching_loss = args.lamda * nn.MSELoss()(
+            calc_reconstruction(netE, data, args.sigma),
+            data
         )
-        gradient_penalty.backward()
+        score_matching_loss.backward()
 
-        Wasserstein_D = D_real - D_fake
-        optimizerD.step()
-        wass_dist.append(Wasserstein_D.item())
+        optimizerE.step()
+        d_costs.append(
+            [D_real.item(), D_fake.item(), score_matching_loss.item()]
+        )
 
-    if iters % 50 == 0:
+    if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
-              'Wass_D: {:5.3f} G_cost: {:5.3f} Time: {:5.3f}'.format(
-               iters, args.iters,
-               (100. * iters) / args.iters,
-               np.mean(wass_dist), np.mean(g_costs),
-               time.time() - start_time
+              'D_costs: {} G_costs: {} Time: {:5.3f}'.format(
+               iters, args.iters, (100. * iters) / args.iters,
+               np.asarray(d_costs).mean(0),
+               np.asarray(g_costs).mean(0),
+               (time.time() - start_time) / 100
               ))
-        start_time = time.time()
-
         sample(netG)
+        torch.save(netG.state_dict(), 'models/ebm_%s.pt' % args.dataset)
+        d_costs = []
+        g_costs = []
+        start_time = time.time()
