@@ -8,7 +8,7 @@ from modules import MLP_Generator, MLP_Discriminator, calc_gradient_penalty
 from data import inf_train_gen
 
 
-def sample(netG, n_points=10 ** 3):
+def sample(netG, n_points):
     z = torch.randn(n_points, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu().numpy()
     plt.clf()
@@ -117,5 +117,5 @@ for iters in range(args.iters):
               ))
         start_time = time.time()
 
-        sample(netG)
+        sample(netG, args.n_points)
         visualize_energy(netD)

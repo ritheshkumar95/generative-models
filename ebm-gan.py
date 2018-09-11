@@ -5,7 +5,8 @@ import argparse
 import torch
 import torch.nn as nn
 
-from modules import MLP_Generator, MLP_Discriminator, MLP_Classifier, calc_gradient_penalty
+from modules import MLP_Generator, MLP_Discriminator, MLP_Classifier
+from modules import calc_reconstruction
 from data import inf_train_gen
 
 
@@ -38,6 +39,8 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
+    parser.add_argument('--sigma', type=float, default=.01)
+    parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--n_points', type=int, default=10 ** 3)
 
@@ -63,9 +66,12 @@ netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netD = MLP_Classifier(args.input_dim, args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+# optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+# optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+# optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, amsgrad=True)
 
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
@@ -119,14 +125,17 @@ for iters in range(args.iters):
         D_fake = D_fake.mean()
         D_fake.backward(mone)
 
-        # gradient_penalty = calc_gradient_penalty(
-        #     netE, x_real.data, x_fake.data
-        # )
-        # gradient_penalty.backward()
+        data = torch.cat([x_real, x_fake], 0)
+        # data = x_fake
+        score_matching_loss = args.lamda * nn.MSELoss()(
+            calc_reconstruction(netE, data, args.sigma),
+            data
+        )
+        score_matching_loss.backward()
 
         optimizerE.step()
         d_costs.append(
-            [D_real.item(), D_fake.item()]
+            [D_real.item(), D_fake.item(), score_matching_loss.item()]
         )
 
     if iters % 100 == 0:
