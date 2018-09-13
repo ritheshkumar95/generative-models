@@ -27,86 +27,105 @@ def calc_reconstruction(netE, data, sigma):
     return data - (sigma ** 2) * score
 
 
-class Generator(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
-        super(Generator, self).__init__()
-        self.preprocess = nn.Sequential(
-            nn.Linear(z_dim, 4 * 4 * 4 * dim),
-            nn.ReLU(True)
-        )
-        self.block1 = nn.Sequential(
-            nn.ConvTranspose2d(4 * dim, 2 * dim, 5),
-            nn.ReLU(True)
-        )
-        self.block2 = nn.Sequential(
-            nn.ConvTranspose2d(2 * dim, dim, 5),
-            nn.ReLU(True)
-        )
-        self.deconv_out = nn.Sequential(
-            nn.ConvTranspose2d(dim, 1, 8, stride=2),
-            nn.Sigmoid()
-        )
-        self.dim = dim
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+        if m.bias.data is not None:
+            m.bias.data.fill_(0)
+    if classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+        m.bias.data.fill_(0)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
 
-    def forward(self, input):
-        output = self.preprocess(input)
-        output = output.view(-1, 4 * self.dim, 4, 4)
-        output = self.block1(output)
-        output = output[:, :, :7, :7]
-        output = self.block2(output)
-        output = self.deconv_out(output)
-        return output
+
+class Generator(nn.Module):
+    def __init__(self, z_dim=128, dim=512):
+        super(Generator, self).__init__()
+        self.dim = dim
+        self.expand = nn.Sequential(
+            nn.Linear(z_dim, dim * 4 * 4),
+            nn.BatchNorm1d(dim * 4 * 4),
+            nn.ReLU(True)
+        )
+
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(dim, dim // 2, 4, 2, 1),
+            nn.BatchNorm2d(dim // 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 2, dim // 4, 4, 2, 1),
+            nn.BatchNorm2d(dim // 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 4, dim // 8, 4, 2, 1),
+            nn.BatchNorm2d(dim // 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 8, 3, 3, 1, 1),
+            nn.Tanh()
+        )
+        self.apply(weights_init)
+
+    def forward(self, z):
+        out = self.expand(z).view(-1, self.dim, 4, 4)
+        return self.main(out)
 
 
 class Discriminator(nn.Module):
-    def __init__(self, dim=64):
+    def __init__(self, dim=512):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True)
+            nn.Conv2d(3, dim // 8, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 8, dim // 4, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 4, dim // 4, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 4, dim // 2, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 2, dim // 2, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 2, dim, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim, dim, 3, 1, 1),
         )
-        self.output = nn.Linear(4 * 4 * 4 * dim, 1)
-        self.dim = dim
+        self.expand = nn.Linear(dim * 4 * 4, 1)
+        self.apply(weights_init)
 
-    def forward(self, input):
-        out = self.main(input)
-        out = out.view(-1, 4 * 4 * 4 * self.dim)
-        out = self.output(out)
-        return out.view(-1)
+    def forward(self, x):
+        out = self.main(x).view(x.size(0), -1)
+        return self.expand(out)
 
 
 class Classifier(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
+    def __init__(self, z_dim=128, dim=512):
         super(Classifier, self).__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.Conv2d(dim, 2 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.Conv2d(2 * dim, 4 * dim, 5, stride=2, padding=2),
-            nn.ReLU(True)
+            nn.Conv2d(3, dim // 8, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 8, dim // 4, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 4, dim // 4, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 4, dim // 2, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 2, dim // 2, 3, 1, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 2, dim, 4, 2, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim, dim, 3, 1, 1),
         )
-        self.mlp1 = nn.Sequential(
-            nn.Linear(4 * 4 * 4 * dim, z_dim),
-            nn.ReLU(True)
-        )
-        self.mlp2 = nn.Sequential(
-            nn.Linear(z_dim * 2, dim),
-            nn.ReLU(True),
+        self.expand = nn.Sequential(
+            nn.Linear(dim * 4 * 4 + z_dim, dim),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(dim, 1)
         )
-        self.dim = dim
+        self.apply(weights_init)
 
     def forward(self, x, z):
-        out = self.main(x)
-        out = out.view(-1, 4 * 4 * 4 * self.dim)
-        out = self.mlp1(out)
+        out = self.main(x).view(x.size(0), -1)
         out = torch.cat([out, z], -1)
-        return self.mlp2(out)
+        return self.expand(out)
 
 
 if __name__ == '__main__':

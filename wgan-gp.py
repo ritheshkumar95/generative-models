@@ -3,41 +3,56 @@ import time
 import argparse
 
 import torch
+from torchvision import datasets, transforms
 from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, calc_gradient_penalty
-from data import inf_train_gen
+
+
+def inf_train_gen(batch_size):
+    transf = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    loader = torch.utils.data.DataLoader(
+        datasets.CIFAR10(
+            '../data/CIFAR10', train=True, download=True,
+            transform=transf
+        ), batch_size=64, drop_last=True
+    )
+    while True:
+        for img, labels in loader:
+            yield img
 
 
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples/wgan-gp_%s.png' % args.dataset)
+    save_image(x_fake, 'samples/wgan-gp_%s.png' % args.dataset, normalize=True)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True)
-
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=100000)
+    parser.add_argument('--iters', type=int, default=200000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--lamda', type=float, default=10)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=64)
+    parser.add_argument('--dim', type=int, default=512)
     args = parser.parse_args()
     return args
 
 
 args = parse_args()
-itr = inf_train_gen(args.dataset, args.batch_size)
+args.dataset = 'CIFAR10'
+itr = inf_train_gen(args.batch_size)
 
 #####################
 # Dump Original Data
 #####################
-orig_data = inf_train_gen(args.dataset, args.batch_size).__next__()
-save_image(orig_data, 'samples/orig_%s.png' % args.dataset)
+orig_data = inf_train_gen(args.batch_size).__next__()
+save_image(orig_data, 'samples/orig_%s.png' % args.dataset, normalize=True)
 
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
@@ -88,15 +103,18 @@ for iters in range(1, args.iters + 1):
         wass_dist.append(Wasserstein_D.item())
         d_costs.append([D_real.item(), D_fake.item()])
 
-    if iters % 500 == 0:
+    if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
               'Wass_D: {:5.3f} D_costs: {} Time: {:5.3f}'.format(
-               iters, args.iters,
-               (500. * iters) / args.iters,
+               iters, args.iters, (100. * iters) / args.iters,
                np.mean(wass_dist), np.asarray(d_costs).mean(0),
-               (time.time() - start_time) / 500
+               (time.time() - start_time) / 100
               ))
+
+        netG.eval()
         sample(netG)
+        netG.train()
+
         torch.save(netG.state_dict(), 'models/wgan-gp_%s.pt' % args.dataset)
         g_costs = []
         wass_dist = []

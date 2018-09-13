@@ -5,56 +5,65 @@ import argparse
 import torch
 import torch.nn as nn
 from torchvision.utils import save_image
+from torchvision import datasets, transforms
 
 from modules import Generator, Discriminator, Classifier
 from modules import calc_reconstruction
-from data import inf_train_gen
+
+
+def inf_train_gen(batch_size):
+    transf = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    loader = torch.utils.data.DataLoader(
+        datasets.CIFAR10(
+            '../data/CIFAR10', train=True, download=True,
+            transform=transf
+        ), batch_size=64, drop_last=True
+    )
+    while True:
+        for img, labels in loader:
+            yield img
 
 
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(
-        x_fake, 'samples/ebm_%s.png' % args.dataset,
-        nrow=8, normalize=True
-    )
+    save_image(x_fake, 'samples/ebm_%s.png' % args.dataset, normalize=True)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True)
-
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=100000)
+    parser.add_argument('--iters', type=int, default=200000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.05)
     parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=64)
+    parser.add_argument('--dim', type=int, default=512)
     args = parser.parse_args()
     return args
 
 
 args = parse_args()
-itr = inf_train_gen(args.dataset, args.batch_size)
+args.dataset = 'CIFAR10'
+itr = inf_train_gen(args.batch_size)
 
 #####################
 # Dump Original Data
 #####################
-orig_data = inf_train_gen(args.dataset, args.batch_size).__next__()
-save_image(
-    orig_data, 'samples/orig_%s.png' % args.dataset,
-    nrow=8, normalize=True
-)
+orig_data = inf_train_gen(args.batch_size).__next__()
+save_image(orig_data, 'samples/orig_%s.png' % args.dataset, normalize=True)
 
 netG = Generator(args.z_dim, args.dim).cuda()
 netE = Discriminator(args.dim).cuda()
 netD = Classifier(args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -125,7 +134,11 @@ for iters in range(args.iters):
                np.asarray(g_costs).mean(0),
                (time.time() - start_time) / 100
               ))
+
+        netG.eval()
         sample(netG)
+        netG.train()
+
         torch.save(netG.state_dict(), 'models/ebm_%s.pt' % args.dataset)
         d_costs = []
         g_costs = []
