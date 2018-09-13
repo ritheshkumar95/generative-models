@@ -19,8 +19,8 @@ def compute_inception_score(netG):
     return get_inception_score(list(all_samples))
 
 
-netG = Generator(dim=128).cuda()
+netG = Generator().cuda()
 netG.eval()
-netG.load_state_dict(torch.load('models/ebm_CIFAR10.pt'))
-# netG.load_state_dict(torch.load('models/wgan-gp_CIFAR10.pt'))
+# netG.load_state_dict(torch.load('models/ebm-fast_CIFAR10.pt'))
+netG.load_state_dict(torch.load('models/wgan-gp-fast_CIFAR10.pt'))
 print(compute_inception_score(netG))
