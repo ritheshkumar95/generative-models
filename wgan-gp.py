@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--lamda', type=float, default=10)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=64)
+    parser.add_argument('--dim', type=int, default=128)
     args = parser.parse_args()
     return args
 
@@ -59,8 +59,8 @@ netD = Discriminator(args.dim).cuda()
 print(netG)
 print(netD)
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
