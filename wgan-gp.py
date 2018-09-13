@@ -28,7 +28,7 @@ def inf_train_gen(batch_size):
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples/wgan-gp_%s.png' % args.dataset, normalize=True)
+    save_image(x_fake, 'samples/wgan-gp-fast_%s.png' % args.dataset, normalize=True)
 
 
 def parse_args():
@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--lamda', type=float, default=10)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=512)
+    parser.add_argument('--dim', type=int, default=64)
     args = parser.parse_args()
     return args
 
@@ -56,6 +56,8 @@ save_image(orig_data, 'samples/orig_%s.png' % args.dataset, normalize=True)
 
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
+print(netG)
+print(netD)
 
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
 optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
@@ -115,7 +117,7 @@ for iters in range(1, args.iters + 1):
         sample(netG)
         netG.train()
 
-        torch.save(netG.state_dict(), 'models/wgan-gp_%s.pt' % args.dataset)
+        torch.save(netG.state_dict(), 'models/wgan-gp-fast_%s.pt' % args.dataset)
         g_costs = []
         wass_dist = []
         start_time = time.time()
