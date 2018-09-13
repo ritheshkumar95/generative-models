@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from modules import Generator
 from tqdm import tqdm
+import sys
 
 
 def compute_inception_score(netG):
@@ -21,6 +22,5 @@ def compute_inception_score(netG):
 
 netG = Generator().cuda()
 netG.eval()
-# netG.load_state_dict(torch.load('models/ebm-fast_CIFAR10.pt'))
-netG.load_state_dict(torch.load('models/wgan-gp-fast_CIFAR10.pt'))
+netG.load_state_dict(torch.load(sys.argv[1]))
 print(compute_inception_score(netG))
