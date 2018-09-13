@@ -2,12 +2,13 @@ import torch
 import numpy as np
 from modules import Generator
 from tqdm import tqdm
+import sys
 
 
 def compute_inception_score(netG):
     from inception_score import get_inception_score
     all_samples = []
-    for i in tqdm(range(10)):
+    for i in tqdm(range(50)):
         samples_100 = torch.randn(100, 128).cuda()
         all_samples.append(
             netG(samples_100).detach().cpu().numpy()
@@ -19,8 +20,7 @@ def compute_inception_score(netG):
     return get_inception_score(list(all_samples))
 
 
-netG = Generator(dim=128).cuda()
+netG = Generator().cuda()
 netG.eval()
-netG.load_state_dict(torch.load('models/ebm_CIFAR10.pt'))
-# netG.load_state_dict(torch.load('models/wgan-gp_CIFAR10.pt'))
+netG.load_state_dict(torch.load(sys.argv[1]))
 print(compute_inception_score(netG))
