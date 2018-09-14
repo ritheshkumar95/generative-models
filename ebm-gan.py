@@ -66,19 +66,15 @@ netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netD = MLP_Classifier(args.input_dim, args.z_dim, args.dim).cuda()
 
-# optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-# optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-# optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, amsgrad=True)
-optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
 
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
 label = torch.ones(2 * args.batch_size).float().cuda()
 label[args.batch_size:].zero_()
-shuf_idxs = np.arange(args.batch_size)
 
 start_time = time.time()
 for iters in range(args.iters):
@@ -126,7 +122,6 @@ for iters in range(args.iters):
         D_fake.backward(mone)
 
         data = torch.cat([x_real, x_fake], 0)
-        # data = x_fake
         score_matching_loss = args.lamda * nn.MSELoss()(
             calc_reconstruction(netE, data, args.sigma),
             data
@@ -144,7 +139,7 @@ for iters in range(args.iters):
                iters, args.iters, (100. * iters) / args.iters,
                np.asarray(d_costs)[-100:].mean(0),
                np.asarray(g_costs)[-100:].mean(0),
-               time.time() - start_time
+               (time.time() - start_time) / 100
               ))
         sample(netG, args.n_points)
         visualize_energy(netE, 500)
