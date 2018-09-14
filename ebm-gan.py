@@ -52,9 +52,9 @@ netG = Generator(args.z_dim, args.dim).cuda()
 netE = Discriminator(args.dim).cuda()
 netD = Classifier(args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
