@@ -35,7 +35,7 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(z_dim, dim * 4, 4, 1, 0, bias=False),
             nn.BatchNorm2d(dim * 4),
             nn.ReLU(True),
-            nn.ConvTranspose2d(dim * 4, dim * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(dim * 4, dim * 2, 4, 1, 0, bias=False),
             nn.BatchNorm2d(dim * 2),
             nn.ReLU(True),
             nn.ConvTranspose2d(dim * 2, dim, 4, 2, 1, bias=False),
@@ -57,7 +57,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(dim, dim * 2, 4, 2, 1),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 2, 1),
+            nn.Conv2d(dim * 2, dim * 4, 4, 1, 0),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(dim * 4, 1, 4, 1, 0)
         )
@@ -74,7 +74,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(dim, dim * 2, 4, 2, 1),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 2, 1),
+            nn.Conv2d(dim * 2, dim * 4, 4, 1, 0),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(dim * 4, z_dim, 4, 1, 0)
         )
