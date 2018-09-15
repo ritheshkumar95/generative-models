@@ -15,42 +15,42 @@ def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
     save_image(
-        x_fake, 'samples/ebm_%s.png' % args.dataset,
+        x_fake, 'samples/ebm_MNIST_%d.png' % args.n_stack,
         nrow=8, normalize=True
     )
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True)
+    parser.add_argument('--n_stack', type=int, default=1)
 
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--sigma', type=float, default=.05)
+    parser.add_argument('--sigma', type=float, default=.1)
     parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=64)
+    parser.add_argument('--dim', type=int, default=512)
     args = parser.parse_args()
     return args
 
 
 args = parse_args()
-itr = inf_train_gen(args.dataset, args.batch_size)
+itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
 
 #####################
 # Dump Original Data
 #####################
-orig_data = inf_train_gen(args.dataset, args.batch_size).__next__()
+orig_data = itr.__next__()
 save_image(
-    orig_data, 'samples/orig_%s.png' % args.dataset,
+    orig_data, 'samples/orig_MNIST_%d.png' % args.n_stack,
     nrow=8, normalize=True
 )
 
-netG = Generator(args.z_dim, args.dim).cuda()
-netE = Discriminator(args.dim).cuda()
-netD = Classifier(args.z_dim, args.dim).cuda()
+netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
+netE = Discriminator(args.n_stack, args.dim).cuda()
+netD = Classifier(args.n_stack, args.z_dim, args.dim).cuda()
 
 optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
 optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
@@ -126,7 +126,7 @@ for iters in range(args.iters):
                (time.time() - start_time) / 100
               ))
         sample(netG)
-        torch.save(netG.state_dict(), 'models/ebm_%s.pt' % args.dataset)
+        torch.save(netG.state_dict(), 'models/ebm_MNIST_%d.pt' % args.n_stack)
         d_costs = []
         g_costs = []
         start_time = time.time()

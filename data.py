@@ -3,14 +3,17 @@ import os
 import numpy as np
 
 
-def inf_train_gen(batch_size, data_dir='../data/MNIST/raw'):
+def inf_train_gen(batch_size, data_dir='../data/MNIST/raw', n_stack=3):
     fd = open(os.path.join(data_dir, 'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd, dtype=np.uint8)
     mnist_X = loaded[16:].reshape((60000, 28, 28, 1)).astype(np.float)
 
     while True:
-        ids = np.random.randint(0, mnist_X.shape[0], size=(batch_size, 3))
-        X_training = np.zeros(shape=(ids.shape[0], 3, 28, 28))
+        ids = np.random.randint(
+            0, mnist_X.shape[0],
+            size=(batch_size, n_stack)
+        )
+        X_training = np.zeros(shape=(ids.shape[0], n_stack, 28, 28))
         for i in range(ids.shape[0]):
             for j in range(ids.shape[1]):
                 X_training[i, j] = mnist_X[ids[i, j], :, :, 0]

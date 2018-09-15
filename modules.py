@@ -18,7 +18,8 @@ def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
 
 def calc_reconstruction(netE, data, sigma):
     data.requires_grad_(True)
-    noisy_data = data + torch.normal(0, torch.ones_like(data) * sigma)
+    # noisy_data = data + torch.normal(0, torch.ones_like(data) * sigma)
+    noisy_data = data
     energy = netE(noisy_data)
     score = torch.autograd.grad(
         outputs=energy, inputs=noisy_data,
@@ -29,79 +30,93 @@ def calc_reconstruction(netE, data, sigma):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
+    def __init__(self, input_dim, z_dim=128, dim=512):
         super(Generator, self).__init__()
+        self.expand = nn.Linear(z_dim, 2 * 2 * dim)
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(z_dim, dim * 4, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(dim * 4),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(dim * 4, dim * 2, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(dim * 2),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(dim * 2, dim, 4, 2, 1, bias=False),
             nn.BatchNorm2d(dim),
             nn.ReLU(True),
-            nn.ConvTranspose2d(dim, 1, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(dim, dim // 2, 5, 2, 2, output_padding=1),
+            nn.BatchNorm2d(dim // 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 2, dim // 4, 5, 2, 2),
+            nn.BatchNorm2d(dim // 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 4, dim // 8, 5, 2, 2, output_padding=1),
+            nn.BatchNorm2d(dim // 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim // 8, input_dim, 5, 2, 2, output_padding=1),
             nn.Tanh()
         )
 
     def forward(self, z):
-        return self.main(z[:, :, None, None])
-
-
-class Discriminator(nn.Module):
-    def __init__(self, dim=64):
-        super(Discriminator, self).__init__()
-        self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim, dim * 2, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 1, 0),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 4, 1, 4, 1, 0)
-        )
-
-    def forward(self, x):
+        x = self.expand(z).view(z.size(0), -1, 2, 2)
         return self.main(x)
 
 
-class Classifier(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
-        super(Classifier, self).__init__()
+class Discriminator(nn.Module):
+    def __init__(self, input_dim, dim=512):
+        super(Discriminator, self).__init__()
+        self.expand = nn.Linear(2 * 2 * dim, 1)
         self.main = nn.Sequential(
-            nn.Conv2d(1, dim, 4, 2, 1),
+            nn.Conv2d(input_dim, dim // 8, 5, 2, 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim, dim * 2, 4, 2, 1),
+            nn.Conv2d(dim // 8, dim // 4, 5, 2, 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 1, 0),
+            nn.Conv2d(dim // 4, dim // 2, 5, 2, 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 4, z_dim, 4, 1, 0)
+            nn.Conv2d(dim // 2, dim, 5, 2, 2),
+            nn.LeakyReLU(0.2, inplace=True),
         )
-        self.mlp = nn.Sequential(
-            nn.Linear(z_dim * 2, dim * 4),
+
+    def forward(self, x):
+        out = self.main(x).view(x.size(0), -1)
+        return self.expand(out)
+
+
+class Classifier(nn.Module):
+    def __init__(self, input_dim=1, z_dim=128, dim=512):
+        super(Classifier, self).__init__()
+        self.expand = nn.Sequential(
+            nn.Linear(2 * 2 * dim, z_dim),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        self.classify = nn.Sequential(
+            nn.Linear(z_dim * 2, dim),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(dim * 4, 1)
+            nn.Linear(dim, 1)
+        )
+        self.main = nn.Sequential(
+            nn.Conv2d(input_dim, dim // 8, 5, 2, 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 8, dim // 4, 5, 2, 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 4, dim // 2, 5, 2, 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(dim // 2, dim, 5, 2, 2),
+            nn.LeakyReLU(0.2, inplace=True),
         )
 
     def forward(self, x, z):
-        out = self.main(x).squeeze()
+        out = self.main(x).view(x.size(0), -1)
+        out = self.expand(out)
         out = torch.cat([out, z], -1)
-        return self.mlp(out)
+        return self.classify(out)
 
 
 if __name__ == '__main__':
     # netD = Discriminator().cuda()
     # print(netD(torch.randn(64, 1, 28, 28).cuda()).size())
-    netG = Generator().cuda()
-    netD = Discriminator().cuda()
+    netG = Generator(1).cuda()
+    netD = Discriminator(1).cuda()
     netC = Classifier().cuda()
 
     z = torch.randn(64, 128).cuda()
     x = netG(z)
-    logits = netD(x)
-    mi = netC(x, z.squeeze())
-
     print(x.shape)
+
+    logits = netD(x)
     print(logits.shape)
+
+    mi = netC(x, z)
     print(mi.shape)
