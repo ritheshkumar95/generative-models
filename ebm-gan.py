@@ -70,7 +70,6 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsg
 optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
 optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
 
-
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
 label = torch.ones(2 * args.batch_size).float().cuda()
