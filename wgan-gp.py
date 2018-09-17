@@ -12,7 +12,7 @@ from data import inf_train_gen
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples/wgan-gp_MNIST_%d.png' % args.n_stack)
+    save_image(x_fake[:, :3], 'samples/wgan-gp_MNIST_%d.png' % args.n_stack)
 
 
 def parse_args():
@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--n_stack', type=int, default=1)
 
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=100000)
+    parser.add_argument('--iters', type=int, default=200000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--lamda', type=float, default=10)
 
@@ -37,7 +37,7 @@ itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
 # Dump Original Data
 #####################
 orig_data = itr.__next__()
-save_image(orig_data, 'samples/orig_MNIST_%d.png' % args.n_stack)
+save_image(orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack)
 
 netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
 netD = Discriminator(args.n_stack, args.dim).cuda()

@@ -42,13 +42,14 @@ for i in tqdm(range(260)):
         x_fake = netG(z) * .5 + .5
         x_fake = x_fake.view(-1, 1, 28, 28)
         classes = F.softmax(classifier(x_fake), -1).max(1)[1]
-        classes = classes.view(100, 3).cpu().numpy()
+        classes = classes.view(100, args.n_stack).cpu().numpy()
 
         for line in classes:
-            counts[line[0], line[1], line[2]] += 1
+            counts[tuple(line)] += 1
 
 
-true_data = np.ones(1000) / 1000.
+n_modes = 10 ** args.n_stack
+true_data = np.ones(n_modes) / float(n_modes)
 print("No. of modes captured: ", len(np.where(counts > 0)[0]))
 counts = counts.flatten() / counts.sum()
 print('Reverse KL: ', KLD(counts, true_data))
