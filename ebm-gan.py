@@ -10,6 +10,11 @@ from modules import calc_reconstruction
 from data import inf_train_gen
 
 
+def log_sum_exp(vec):
+    max_val = vec.max()[0]
+    return max_val + (vec - max_val).exp().sum().log()
+
+
 def sample(netG, n_points=10 ** 3):
     z = torch.randn(n_points, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu().numpy()
@@ -87,16 +92,17 @@ for iters in range(args.iters):
     x_fake = netG(z)
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    D_fake.backward(one, retain_graph=True)
+    D_fake.backward(one)
 
-    z_bar = z.clone()[torch.randperm(z.size(0))]
+    x_fake = x_fake.detach()
+    z_bar = torch.randn(args.batch_size, args.z_dim).cuda()
     orig_x_z = torch.cat([x_fake, z], -1)
     shuf_x_z = torch.cat([x_fake, z_bar], -1)
     concat_x_z = torch.cat([orig_x_z, shuf_x_z], 0)
 
-    logits = netD(concat_x_z)
+    logits = netD(concat_x_z).squeeze()
     dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    # dim_estimate.backward()
+    dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
