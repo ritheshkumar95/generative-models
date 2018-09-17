@@ -15,7 +15,7 @@ def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
     save_image(
-        x_fake, 'samples/ebm_MNIST_%d.png' % args.n_stack,
+        x_fake[:, :3], 'samples/ebm_MNIST_%d.png' % args.n_stack,
         nrow=8, normalize=True
     )
 
@@ -44,7 +44,7 @@ itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
 #####################
 orig_data = itr.__next__()
 save_image(
-    orig_data, 'samples/orig_MNIST_%d.png' % args.n_stack,
+    orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack,
     nrow=8, normalize=True
 )
 

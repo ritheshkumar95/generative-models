@@ -35,7 +35,7 @@ netG.eval()
 classifier = Net().cuda()
 classifier.load_state_dict(torch.load('models/pretrained_classifier.pt'))
 
-counts = np.zeros((10, 10, 10))
+counts = np.zeros([10] * args.n_stack)
 for i in tqdm(range(260)):
     with torch.no_grad():
         z = torch.randn(100, args.z_dim).cuda()
