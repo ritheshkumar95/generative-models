@@ -32,7 +32,7 @@ def reinforce(rewards, log_probs, optimizer, gamma):
     optimizer.step()
 
 
-def reinforce_w_baseline(rewards, log_probs, values, optimizer, gamma):
+def reinforce_w_baseline(rewards, log_probs, entropies, values, optimizer, gamma):
     returns = torch.tensor(
         compute_discounted_returns(rewards, gamma)
     )
@@ -44,6 +44,8 @@ def reinforce_w_baseline(rewards, log_probs, values, optimizer, gamma):
     policy_loss = 0
     for log_prob, g_t in zip(log_probs, returns):
         policy_loss += -log_prob * g_t
+
+    policy_loss -= 0.01 * torch.stack(entropies).sum()
 
     value_fn_loss = F.smooth_l1_loss(
         torch.cat(values),
@@ -63,41 +65,37 @@ def reinforce_curiosity(reward, log_probs, optimizer):
     optimizer.step()
 
 
-def actor_critic(rewards, log_probs, values, optimizer, gamma):
-    returns = torch.tensor(
-        compute_discounted_returns(rewards, gamma)
-    )
-
-    eps = np.finfo(np.float32).eps.item()
-    returns = (returns - returns.mean()) / (returns.std() + eps)
-
+def a2c(rewards, log_probs, entropies, values, policy, optimizer, gamma):
+    R = values[-1].detach().numpy()
     policy_loss = 0
-    for log_prob, g_t, b_t in zip(log_probs, returns, values):
-        reward = g_t - b_t.item()
-        policy_loss += -log_prob * reward
+    value_loss = 0
+    gae = torch.tensor([1., ])
+    for i in reversed(range(len(rewards))):
+        R = gamma * R + rewards[i]
+        advantage = torch.tensor([R, ]) - values[i]
+        value_loss = value_loss + 0.5 * advantage.pow(2)
 
-    value_fn_loss = F.smooth_l1_loss(
-        torch.cat(values),
-        torch.tensor(returns, dtype=torch.float32)
-    )
+        # Generalized Advantage Estimataion
+        delta_t = rewards[i] + gamma * values[i + 1].data - values[i].data
+        gae = gae * gamma + delta_t
+
+        policy_loss = policy_loss - log_probs[i] * gae - 0.01 * entropies[i]
 
     optimizer.zero_grad()
-    (policy_loss + value_fn_loss).backward()
+    (policy_loss + 0.5 * value_loss).backward()
+    torch.nn.utils.clip_grad_norm(policy.parameters(), 40)
     optimizer.step()
 
 
-def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
-    alpha = torch.rand_like(real_data)
-    interpolates = alpha * real_data + (1 - alpha) * fake_data
-    interpolates.requires_grad_(True)
-    disc_interpolates = netD(interpolates)
-    gradients = torch.autograd.grad(
-        outputs=disc_interpolates, inputs=interpolates,
-        grad_outputs=torch.ones_like(disc_interpolates),
+def calc_reconstruction(netE, data, sigma):
+    data.requires_grad_(True)
+    energy = netE(data)
+    score = torch.autograd.grad(
+        outputs=energy, inputs=data,
+        grad_outputs=torch.ones_like(energy),
         create_graph=True, retain_graph=True, only_inputs=True
     )[0]
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * lamda
-    return gradient_penalty
+    return data - (sigma ** 2) * score
 
 
 def train_generative_model(
@@ -160,14 +158,16 @@ def train_generative_model(
         D_fake = D_fake.mean()
         (-D_fake).backward()
 
-        gradient_penalty = calc_gradient_penalty(
-            netE, x_real.data, x_fake.data
+        data = torch.cat([x_real, x_fake], 0)
+        score_matching_loss = nn.MSELoss()(
+            calc_reconstruction(netE, data, args.sigma),
+            data
         )
-        gradient_penalty.backward()
+        score_matching_loss.backward()
 
         optimizerE.step()
         d_costs.append(
-            [D_real.item(), D_fake.item()]
+            [D_real.item(), D_fake.item(), score_matching_loss.item()]
         )
 
     return g_costs, d_costs

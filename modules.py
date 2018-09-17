@@ -43,7 +43,8 @@ class PolicyWithValueFn(nn.Module):
         dist = Categorical(action_probs)
         a_t = dist.sample()
         log_prob = dist.log_prob(a_t)
-        return value, log_prob, a_t.item()
+        entropy = (-action_probs * action_probs.log()).sum()
+        return value, log_prob, a_t.item(), entropy
 
 
 class Policy(nn.Module):

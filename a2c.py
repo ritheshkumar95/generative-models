@@ -6,7 +6,7 @@ from itertools import count
 import torch
 
 from modules import PolicyWithValueFn
-from algorithms import reinforce_w_baseline
+from algorithms import a2c
 from tensorboardX import SummaryWriter
 
 
@@ -29,15 +29,15 @@ args = parser.parse_args()
 
 
 writer = SummaryWriter(args.log_dir)
-# env = GridWorld(args.grid_size, state_config='2D')
-env = gym.make('CartPole-v1')
-env.seed(args.seed)
+env = GridWorld(args.grid_size, state_config='2D')
+# env = gym.make('CartPole-v1')
+# env.seed(args.seed)
 torch.manual_seed(args.seed)
 
-n_actions = env.action_space.n
-n_input = env.observation_space.shape[0]
-# n_actions = env.action_shape[0]
-# n_input = env.state_shape[0]
+n_actions = env.action_shape[0]
+n_input = env.state_shape[0]
+# n_actions = env.action_space.n
+# n_input = env.observation_space.shape[0]
 
 policy = PolicyWithValueFn(n_input, n_actions, args.dim)
 optimizer = torch.optim.Adam(policy.parameters(), lr=1e-3, amsgrad=True)
@@ -51,13 +51,14 @@ def main():
         epi_rewards = []
         epi_log_probs = []
         epi_values = []
+        epi_entropies = []
         g_t = 0
 
         for t in range(1000):  # Don't infinite loop while learning
             value, log_prob, action, entropy = policy.select_action(
                 torch.from_numpy(state).float()
             )
-            state, reward, done, _ = env.step(action)
+            state, reward, done = env.step(action)
             g_t += reward
 
             if args.render:
@@ -66,13 +67,21 @@ def main():
             epi_rewards.append(reward)
             epi_log_probs.append(log_prob)
             epi_values.append(value)
+            epi_entropies.append(entropy)
 
             if done:
                 break
 
+        if done:
+            epi_values.append(torch.tensor([0., ]))
+        else:
+            epi_values.append(policy(
+                torch.from_numpy(state).float()
+            )[1])
+
         writer.add_scalar('/return/', g_t, i_episode)
         running_reward = running_reward * 0.99 + g_t * 0.01
-        reinforce_w_baseline(epi_rewards, epi_log_probs, epi_values, optimizer, args.gamma)
+        a2c(epi_rewards, epi_log_probs, epi_entropies, epi_values, optimizer, args.gamma)
 
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
