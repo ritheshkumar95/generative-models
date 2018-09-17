@@ -15,7 +15,7 @@ def sample(netG, n_points=10 ** 3):
     x_fake = netG(z).detach().cpu().numpy()
     plt.clf()
     plt.scatter(x_fake[:, 0], x_fake[:, 1])
-    plt.savefig('ebm_samples.png')
+    plt.savefig('ebm_samples_%s.png' % args.dataset)
 
 
 def visualize_energy(netE, n_points=100):
@@ -29,7 +29,7 @@ def visualize_energy(netE, n_points=100):
     plt.clf()
     plt.imshow(e_grid, origin='lower')
     plt.colorbar()
-    plt.savefig('ebm_energies.png')
+    plt.savefig('ebm_energies_%s.png' % args.dataset)
 
 
 def parse_args():
@@ -60,7 +60,7 @@ itr = inf_train_gen(args.dataset, args.batch_size)
 orig_data = inf_train_gen(args.dataset, args.n_points).__next__()
 plt.clf()
 plt.scatter(orig_data[:, 0], orig_data[:, 1])
-plt.savefig('orig_samples.png')
+plt.savefig('orig_samples_%s.png' % args.dataset)
 
 netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
@@ -96,7 +96,7 @@ for iters in range(args.iters):
 
     logits = netD(concat_x_z)
     dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    dim_estimate.backward()
+    # dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
