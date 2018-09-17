@@ -81,7 +81,7 @@ for iters in range(args.iters):
 
     logits = netD(concat_x, concat_z)
     dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    dim_estimate.backward()
+    # dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
