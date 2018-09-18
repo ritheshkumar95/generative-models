@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--sigma', type=float, default=.1)
+    parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
@@ -75,19 +75,22 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(one, retain_graph=True)
 
-    z_bar = z.clone()[torch.randperm(z.size(0))]
-    concat_x = torch.cat([x_fake, x_fake], 0)
-    concat_z = torch.cat([z, z_bar], 0)
+    # z_bar = z.clone()[torch.randperm(z.size(0))]
+    # concat_x = torch.cat([x_fake, x_fake], 0)
+    # concat_z = torch.cat([z, z_bar], 0)
 
-    logits = netD(concat_x, concat_z)
-    dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
+    # logits = netD(concat_x, concat_z)
+    # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
     # dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
+    # g_costs.append(
+    #     [D_fake.item(), dim_estimate.item()]
+    # )
     g_costs.append(
-        [D_fake.item(), dim_estimate.item()]
+        [D_fake.item()]
     )
 
     for i in range(args.critic_iters):
@@ -117,13 +120,13 @@ for iters in range(args.iters):
             [D_real.item(), D_fake.item(), score_matching_loss.item()]
         )
 
-    if iters % 100 == 0:
+    if iters % 50 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
               'D_costs: {} G_costs: {} Time: {:5.3f}'.format(
-               iters, args.iters, (100. * iters) / args.iters,
+               iters, args.iters, (50. * iters) / args.iters,
                np.asarray(d_costs).mean(0),
                np.asarray(g_costs).mean(0),
-               (time.time() - start_time) / 100
+               (time.time() - start_time) / 50
               ))
         sample(netG)
         torch.save(netG.state_dict(), 'models/ebm_MNIST_%d.pt' % args.n_stack)
