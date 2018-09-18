@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, calc_gradient_penalty
+from eval import tf_inception_score
 
 
 def inf_train_gen(batch_size):
@@ -121,3 +122,14 @@ for iters in range(1, args.iters + 1):
         g_costs = []
         wass_dist = []
         start_time = time.time()
+
+    if iters % 1000 == 0:
+        start = time.time()
+        netG.eval()
+        mean, std = tf_inception_score(netG)
+        print("-" * 100)
+        print("Inception Score: mean = {} std = {} time: {:5.3f}".format(
+            mean, std, time.time()-start
+        ))
+        print("-" * 100)
+        netG.train()

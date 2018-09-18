@@ -31,7 +31,8 @@ def pytorch_inception_score(netG):
     return inception_score(all_samples, resize=True, splits=10)
 
 
-netG = Generator(dim=128).cuda()
-netG.eval()
-netG.load_state_dict(torch.load(sys.argv[1]))
-print(tf_inception_score(netG))
+if __name__ == '__main__':
+    netG = Generator(dim=128).cuda()
+    netG.eval()
+    netG.load_state_dict(torch.load(sys.argv[1]))
+    print(tf_inception_score(netG))

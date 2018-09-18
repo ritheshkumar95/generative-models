@@ -9,6 +9,7 @@ from torchvision import datasets, transforms
 
 from modules import Generator, Discriminator, Classifier
 from modules import calc_reconstruction
+from eval import tf_inception_score
 
 
 def inf_train_gen(batch_size):
@@ -64,9 +65,9 @@ print(netG)
 print(netE)
 print(netD)
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=3e-4, betas=(0.5, 0.9))
-optimizerD = torch.optim.Adam(netD.parameters(), lr=3e-4, betas=(0.5, 0.9))
-optimizerE = torch.optim.Adam(netE.parameters(), lr=3e-4, betas=(0.5, 0.9))
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -146,3 +147,14 @@ for iters in range(args.iters):
         d_costs = []
         g_costs = []
         start_time = time.time()
+
+    if iters % 1000 == 0:
+        start = time.time()
+        netG.eval()
+        mean, std = tf_inception_score(netG)
+        print("-" * 100)
+        print("Inception Score: mean = {} std = {} time: {:5.3f}".format(
+            mean, std, time.time()-start
+        ))
+        print("-" * 100)
+        netG.train()
