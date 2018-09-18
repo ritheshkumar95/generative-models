@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=200000)
     parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--sigma', type=float, default=.05)
+    parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
@@ -91,15 +91,15 @@ for iters in range(args.iters):
     concat_x = torch.cat([x_fake, x_fake], 0)
     concat_z = torch.cat([z, z_bar], 0)
 
-    logits = netD(concat_x, concat_z)
-    dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    dim_estimate.backward()
+    # logits = netD(concat_x, concat_z)
+    # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
+    # dim_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item(), dim_estimate.item()]
+        [D_fake.item()]
     )
 
     for i in range(args.critic_iters):
