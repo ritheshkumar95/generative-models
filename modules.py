@@ -66,13 +66,13 @@ class MLP_Classifier(nn.Module):
     def __init__(self, input_dim, z_dim, dim):
         super().__init__()
         self.main = nn.Sequential(
-            nn.Linear(input_dim + z_dim, dim),
+            nn.Linear(input_dim, dim),
             nn.ReLU(True),
             nn.Linear(dim, dim),
             nn.ReLU(True),
             nn.Linear(dim, dim),
             nn.ReLU(True),
-            nn.Linear(dim, 1)
+            nn.Linear(dim, z_dim)
         )
 
     def forward(self, x):

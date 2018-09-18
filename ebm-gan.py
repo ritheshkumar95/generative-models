@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--entropy_coeff', type=float, default=.01)
 
     parser.add_argument('--n_points', type=int, default=10 ** 3)
 
@@ -71,9 +72,9 @@ netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netD = MLP_Classifier(args.input_dim, args.z_dim, args.dim).cuda()
 
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -92,23 +93,32 @@ for iters in range(args.iters):
     x_fake = netG(z)
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    D_fake.backward(one)
+    D_fake.backward(one, retain_graph=True)
 
-    x_fake = x_fake.detach()
+    # x_fake = x_fake.detach()
+    # z_bar = z.clone()[torch.randperm(z.size(0))]
+    # orig_x_z = torch.cat([x_fake, z], -1)
+    # shuf_x_z = torch.cat([x_fake, z_bar], -1)
+    # concat_x_z = torch.cat([orig_x_z, shuf_x_z], 0)
+
+    # logits = netD(concat_x_z).squeeze()
+    # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
+    # dim_estimate.backward()
+
     z_bar = torch.randn(args.batch_size, args.z_dim).cuda()
-    orig_x_z = torch.cat([x_fake, z], -1)
-    shuf_x_z = torch.cat([x_fake, z_bar], -1)
-    concat_x_z = torch.cat([orig_x_z, shuf_x_z], 0)
-
-    logits = netD(concat_x_z).squeeze()
-    dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    dim_estimate.backward()
+    x = netD(x_fake)
+    scores = (z_bar[:, None] * x[None]).sum(-1)
+    cpc_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        scores,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    cpc_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item(), dim_estimate.item()]
+        [D_fake.item(), cpc_estimate.item()]
     )
 
     for i in range(args.critic_iters):
