@@ -29,7 +29,7 @@ def calc_reconstruction(netE, data, sigma):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
+    def __init__(self, z_dim=128, dim=128):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
             nn.ConvTranspose2d(z_dim, dim * 4, 4, 1, 0, bias=False),
@@ -50,7 +50,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, dim=64):
+    def __init__(self, dim=128):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
             nn.Conv2d(3, dim, 4, 2, 1),
@@ -67,7 +67,7 @@ class Discriminator(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, z_dim=128, dim=64):
+    def __init__(self, z_dim=128, dim=128):
         super(Classifier, self).__init__()
         self.main = nn.Sequential(
             nn.Conv2d(3, dim, 4, 2, 1),

@@ -32,7 +32,7 @@ def pytorch_inception_score(netG):
 
 
 if __name__ == '__main__':
-    netG = Generator(dim=128).cuda()
+    netG = Generator().cuda()
     netG.eval()
     netG.load_state_dict(torch.load(sys.argv[1]))
     print(tf_inception_score(netG))
