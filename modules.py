@@ -78,16 +78,17 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(dim * 4, z_dim, 4, 1, 0)
         )
-        self.mlp = nn.Sequential(
-            nn.Linear(z_dim * 2, dim * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(dim * 4, 1)
-        )
+        # self.mlp = nn.Sequential(
+        #     nn.Linear(z_dim * 2, dim * 4),
+        #     nn.LeakyReLU(0.2, inplace=True),
+        #     nn.Linear(dim * 4, 1)
+        # )
 
-    def forward(self, x, z):
+    def forward(self, x):
         out = self.main(x).squeeze()
-        out = torch.cat([out, z], -1)
-        return self.mlp(out)
+        # out = torch.cat([out, z], -1)
+        # return self.mlp(out)
+        return out
 
 
 if __name__ == '__main__':

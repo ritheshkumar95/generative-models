@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=128)
@@ -88,19 +89,27 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(one, retain_graph=True)
 
-    z_bar = z.clone()[torch.randperm(z.size(0))]
-    concat_x = torch.cat([x_fake, x_fake], 0)
-    concat_z = torch.cat([z, z_bar], 0)
+    # z_bar = z.clone()[torch.randperm(z.size(0))]
+    # concat_x = torch.cat([x_fake, x_fake], 0)
+    # concat_z = torch.cat([z, z_bar], 0)
 
     # logits = netD(concat_x, concat_z)
     # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
     # dim_estimate.backward()
 
+    x = netD(x_fake)
+    score = (z[:, None] * x[None]).sum(-1)
+    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        score,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    mi_estimate.backward()
+
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item()]
+        [D_fake.item(), mi_estimate.item()]
     )
 
     for i in range(args.critic_iters):
