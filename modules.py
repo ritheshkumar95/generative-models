@@ -86,15 +86,16 @@ class Discriminator(nn.Module):
 class Classifier(nn.Module):
     def __init__(self, input_dim=1, z_dim=128, dim=512):
         super(Classifier, self).__init__()
-        self.expand = nn.Sequential(
-            nn.Linear(2 * 2 * dim, z_dim),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-        self.classify = nn.Sequential(
-            nn.Linear(z_dim * 2, dim),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(dim, 1)
-        )
+        # self.expand = nn.Sequential(
+        #     nn.Linear(2 * 2 * dim, z_dim),
+        #     nn.LeakyReLU(0.2, inplace=True)
+        # )
+        # self.classify = nn.Sequential(
+        #     nn.Linear(z_dim * 2, dim),
+        #     nn.LeakyReLU(0.2, inplace=True),
+        #     nn.Linear(dim, 1)
+        # )
+        self.expand = nn.Linear(2 * 2 * dim, z_dim)
         self.main = nn.Sequential(
             nn.Conv2d(input_dim, dim // 8, 5, 2, 2),
             nn.LeakyReLU(0.2, inplace=True),
@@ -106,11 +107,12 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
         )
 
-    def forward(self, x, z):
+    def forward(self, x):
         out = self.main(x).view(x.size(0), -1)
         out = self.expand(out)
-        out = torch.cat([out, z], -1)
-        return self.classify(out)
+        # out = torch.cat([out, z], -1)
+        # return self.classify(out)
+        return out
 
 
 if __name__ == '__main__':

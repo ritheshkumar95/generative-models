@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
@@ -52,9 +53,9 @@ netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
 netE = Discriminator(args.n_stack, args.dim).cuda()
 netD = Classifier(args.n_stack, args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -83,15 +84,23 @@ for iters in range(args.iters):
     # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
     # dim_estimate.backward()
 
+    x = netD(x_fake)
+    score = (z[:, None] * x[None]).sum(-1)
+    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        score,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    mi_estimate.backward()
+
     optimizerG.step()
     optimizerD.step()
 
-    # g_costs.append(
-    #     [D_fake.item(), dim_estimate.item()]
-    # )
     g_costs.append(
-        [D_fake.item()]
+        [D_fake.item(), mi_estimate.item()]
     )
+    # g_costs.append(
+    #     [D_fake.item()]
+    # )
 
     for i in range(args.critic_iters):
         x_real = itr.__next__().cuda()
