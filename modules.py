@@ -29,66 +29,79 @@ def calc_reconstruction(netE, data, sigma):
 
 
 class Generator(nn.Module):
-    def __init__(self, z_dim=128, dim=128):
+    def __init__(self, z_dim=128, dim=512):
         super(Generator, self).__init__()
+        self.expand = nn.Linear(z_dim, 4 * 4 * dim)
+            
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(z_dim, dim * 4, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(dim * 4),
+            nn.ConvTranspose2d(dim, dim // 2, 4, 2, 1),
+            nn.BatchNorm2d(dim // 2),
             nn.ReLU(True),
-            nn.ConvTranspose2d(dim * 4, dim * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(dim * 2),
+            nn.ConvTranspose2d(dim // 2, dim // 4, 4, 2, 1),
+            nn.BatchNorm2d(dim // 4),
             nn.ReLU(True),
-            nn.ConvTranspose2d(dim * 2, dim, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(dim),
+            nn.ConvTranspose2d(dim // 4, dim // 8, 4, 2, 1),
+            nn.BatchNorm2d(dim // 8),
             nn.ReLU(True),
-            nn.ConvTranspose2d(dim, 3, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(dim // 8, 3, 3, 1, 1),
             nn.Tanh()
         )
 
     def forward(self, z):
-        return self.main(z[:, :, None, None])
+        out = self.expand(z).view(z.size(0), -1, 4, 4)
+        return self.main(out)
 
 
 class Discriminator(nn.Module):
-    def __init__(self, dim=128):
+    def __init__(self, dim=512):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(3, dim, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim, dim * 2, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 4, 1, 4, 1, 0)
+            nn.Conv2d(3, dim // 8, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 8, dim // 8, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 8, dim // 4, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 4, dim // 4, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 4, dim // 2, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 2, dim // 2, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 2, dim, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True)
         )
+        self.expand = nn.Linear(4 * 4 * dim, 1)
 
     def forward(self, x):
-        return self.main(x)
+        out = self.main(x).view(x.size(0), -1)
+        return self.expand(out)
 
 
 class Classifier(nn.Module):
-    def __init__(self, z_dim=128, dim=128):
+    def __init__(self, z_dim=128, dim=512):
         super(Classifier, self).__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(3, dim, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim, dim * 2, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 2, dim * 4, 4, 2, 1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(dim * 4, z_dim, 4, 1, 0)
+            nn.Conv2d(3, dim // 8, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 8, dim // 8, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 8, dim // 4, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 4, dim // 4, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 4, dim // 2, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 2, dim // 2, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim // 2, dim, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True)
         )
-        # self.mlp = nn.Sequential(
-        #     nn.Linear(z_dim * 2, dim * 4),
-        #     nn.LeakyReLU(0.2, inplace=True),
-        #     nn.Linear(dim * 4, 1)
-        # )
+        self.expand = nn.Linear(4 * 4 * dim, z_dim)
 
     def forward(self, x):
-        out = self.main(x).squeeze()
-        # out = torch.cat([out, z], -1)
-        # return self.mlp(out)
-        return out
+        out = self.main(x).view(x.size(0), -1)
+        return self.expand(out)
 
 
 if __name__ == '__main__':
@@ -101,7 +114,7 @@ if __name__ == '__main__':
     z = torch.randn(64, 128).cuda()
     x = netG(z)
     logits = netD(x)
-    mi = netC(x, z.squeeze())
+    mi = netC(x)
 
     print(x.shape)
     print(logits.shape)

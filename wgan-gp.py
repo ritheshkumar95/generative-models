@@ -40,7 +40,7 @@ def parse_args():
     parser.add_argument('--lamda', type=float, default=10)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=128)
+    parser.add_argument('--dim', type=int, default=512)
     args = parser.parse_args()
     return args
 

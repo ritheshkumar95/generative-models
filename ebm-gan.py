@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--dim', type=int, default=128)
+    parser.add_argument('--dim', type=int, default=512)
     args = parser.parse_args()
     return args
 
