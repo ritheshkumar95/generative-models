@@ -25,7 +25,7 @@ class ModeCollapseEval(object):
 
     def count_modes(self, netG):
         counts = np.zeros([10] * self.n_stack)
-        for i in tqdm(range(260)):
+        for i in tqdm(range(1000)):
             with torch.no_grad():
                 z = torch.randn(100, self.z_dim).cuda()
                 x_fake = netG(z) * .5 + .5
