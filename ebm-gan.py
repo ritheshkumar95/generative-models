@@ -72,9 +72,9 @@ netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netD = MLP_Classifier(args.input_dim, args.z_dim, args.dim).cuda()
 
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
