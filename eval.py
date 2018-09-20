@@ -5,10 +5,10 @@ from tqdm import tqdm
 import sys
 
 
-def tf_inception_score(netG):
+def tf_inception_score(netG, n_samples=5000):
     from inception_score import get_inception_score
     all_samples = []
-    for i in tqdm(range(50)):
+    for i in tqdm(range(n_samples // 100)):
         samples_100 = torch.randn(100, 128).cuda()
         all_samples.append(
             netG(samples_100).detach().cpu().numpy()
@@ -35,4 +35,4 @@ if __name__ == '__main__':
     netG = Generator().cuda()
     netG.eval()
     netG.load_state_dict(torch.load(sys.argv[1]))
-    print(tf_inception_score(netG))
+    print(tf_inception_score(netG, n_samples=50000))

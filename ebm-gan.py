@@ -97,19 +97,19 @@ for iters in range(1, args.iters):
     # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
     # dim_estimate.backward()
 
-    # x = netD(x_fake)
-    # score = (z[:, None] * x[None]).sum(-1)
-    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-    #     score,
-    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
-    # )
-    # mi_estimate.backward()
+    x = netD(x_fake)
+    score = (z[:, None] * x[None]).sum(-1)
+    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        score,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item()]
+        [D_fake.item(), mi_estimate.item()]
     )
 
     for i in range(args.critic_iters):
