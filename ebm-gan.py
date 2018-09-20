@@ -37,7 +37,7 @@ def sample(netG, batch_size=64):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=200000)
+    parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, required=True)
     parser.add_argument('--lamda', type=float, default=1)
@@ -157,7 +157,7 @@ for iters in range(1, args.iters):
         g_costs = []
         start_time = time.time()
 
-    if iters % 250 == 0:
+    if iters % 1000 == 0:
         start = time.time()
         netG.eval()
         mean, std = tf_inception_score(netG)
