@@ -35,7 +35,7 @@ def sample(netG, batch_size=64):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=200000)
+    parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--lamda', type=float, default=10)
 
