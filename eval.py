@@ -21,12 +21,13 @@ class ModeCollapseEval(object):
         self.classifier = Net().cuda()
         self.classifier.load_state_dict(torch.load('models/pretrained_classifier.pt'))
         self.n_stack = n_stack
-        self.n_samples = 10 ** (args.n_stack + 1)
+        self.n_samples = 10 ** (n_stack + 1)
         self.z_dim = z_dim
 
     def count_modes(self, netG):
         counts = np.zeros([10] * self.n_stack)
-        for i in tqdm(range(self.n_samples // 1000)):
+        n_batches = max(1, self.n_samples // 1000)
+        for i in tqdm(range(n_batches)):
             with torch.no_grad():
                 z = torch.randn(1000, self.z_dim).cuda()
                 x_fake = netG(z) * .5 + .5

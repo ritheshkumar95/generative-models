@@ -137,7 +137,8 @@ for iters in range(args.iters):
                (time.time() - start_time) / 100
               ))
         sample(netG)
-        torch.save(netG.state_dict(), 'models/ebm_MNIST_%d.pt' % args.n_stack)
+        torch.save(netG.state_dict(), 'models/ebm_netG_MNIST_%d.pt' % args.n_stack)
+        torch.save(netE.state_dict(), 'models/ebm_netE_MNIST_%d.pt' % args.n_stack)
         d_costs = []
         g_costs = []
         start_time = time.time()
