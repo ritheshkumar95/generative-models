@@ -4,9 +4,10 @@ import argparse
 import torch
 from tqdm import tqdm
 
-from modules import MLP_Discriminator
+from modules import MLP_Discriminator, MLP_Generator
 from modules import calc_reconstruction
 from data import inf_train_gen
+from imageio import imread, mimwrite
 
 
 def log_sum_exp(vec):
@@ -64,12 +65,18 @@ def parse_args():
 args = parse_args()
 
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
+netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE.load_state_dict(torch.load('toy_models/ebm_netE_%s.pt' % args.dataset))
+netG.load_state_dict(torch.load('toy_models/ebm_netG_%s.pt' % args.dataset))
 
-x = torch.zeros(args.n_points, 2).cuda()
-x.data.uniform_(-2, 2)
+# x = torch.zeros(args.n_points, 2).cuda()
+# x.data.uniform_(-2, 2)
 
-for i in tqdm(range(1, 501)):
+z = torch.randn(args.n_points, args.z_dim).cuda()
+x = netG(z).detach()
+
+images = []
+for i in tqdm(range(1, 251)):
     x.requires_grad_(True)
     e_x = netE(x)
     score = torch.autograd.grad(
@@ -77,6 +84,7 @@ for i in tqdm(range(1, 501)):
         grad_outputs=torch.ones_like(e_x),
         create_graph=True, retain_graph=False, only_inputs=True
     )[0]
+    score = score / torch.norm(score.view(x.size(0), -1), 2, dim=-1, keepdim=True)
 
     noise = torch.normal(0, torch.ones_like(x) * args.lamda2).cuda()
     x = (x - args.lamda1 * score + noise).detach()
@@ -86,3 +94,7 @@ for i in tqdm(range(1, 501)):
         plt.clf()
         plt.scatter(img[:, 0], img[:, 1])
         plt.savefig('mcmc_samples/image_%05d.png' % i)
+        images.append(imread('mcmc_samples/image_%05d.png' % i))
+
+mimwrite('mcmc.gif', images)
+

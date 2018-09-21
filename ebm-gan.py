@@ -86,8 +86,8 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
-label = torch.ones(2 * args.batch_size).float().cuda()
-label[args.batch_size:].zero_()
+schedule = np.linspace(2., 0.001, 10000).tolist() + [.001] * (args.iters-10000)
+print(schedule)
 
 start_time = time.time()
 for iters in range(args.iters):
