@@ -103,19 +103,19 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(retain_graph=True)
 
-    # x = netD(x_fake)
-    # scores = (z[:, None] * x[None]).sum(-1)
-    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-    #     scores,
-    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
-    # )
-    # mi_estimate.backward()
+    x = netD(x_fake)
+    scores = (z[:, None] * x[None]).sum(-1)
+    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        scores,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item()]
+        [D_fake.item(), mi_estimate.item()]
     )
 
     for i in range(args.critic_iters):
