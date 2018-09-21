@@ -10,43 +10,6 @@ from data import inf_train_gen
 from imageio import imread, mimwrite
 
 
-def log_sum_exp(vec):
-    max_val = vec.max()[0]
-    return max_val + (vec - max_val).exp().sum().log()
-
-
-def sample(netE, netG, n_points=10 ** 3):
-    z = torch.randn(n_points, args.z_dim).cuda()
-    x_fake = netG(z).detach()
-    Z = log_sum_exp(-netE(x_fake).squeeze()).exp().item()
-
-    x_fake = x_fake.cpu().numpy()
-    plt.clf()
-    plt.scatter(x_fake[:, 0], x_fake[:, 1])
-    plt.savefig('toy_samples/ebm_samples_%s.png' % args.dataset)
-    return Z
-
-
-def visualize_energy(Z, netE, n_points=100):
-    x = np.linspace(-2, 2, n_points)
-    y = np.linspace(-2, 2, n_points)
-    grid = np.asarray(np.meshgrid(x, y)).transpose(1, 2, 0).reshape((-1, 2))
-    grid = torch.from_numpy(grid).float().cuda()
-    energies = netE(grid).detach().cpu().numpy()
-    e_grid = energies.reshape((n_points, n_points))
-    p_grid = np.exp(-e_grid) / Z
-
-    plt.clf()
-    plt.imshow(e_grid, origin='lower')
-    plt.colorbar()
-    plt.savefig('toy_samples/ebm_energies_%s.png' % args.dataset)
-
-    plt.clf()
-    plt.imshow(p_grid, origin='lower')
-    plt.colorbar()
-    plt.savefig('toy_samples/ebm_densities_%s.png' % args.dataset)
-
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=True)

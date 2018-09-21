@@ -18,23 +18,23 @@ def log_sum_exp(vec):
 def sample(netE, netG, n_points=10 ** 3):
     z = torch.randn(n_points, args.z_dim).cuda()
     x_fake = netG(z).detach()
-    Z = log_sum_exp(-netE(x_fake).squeeze()).exp().item()
+    log_Z = log_sum_exp(-netE(x_fake).squeeze()).item()
 
     x_fake = x_fake.cpu().numpy()
     plt.clf()
     plt.scatter(x_fake[:, 0], x_fake[:, 1])
     plt.savefig('toy_samples/ebm_samples_%s.png' % args.dataset)
-    return Z
+    return log_Z
 
 
-def visualize_energy(Z, netE, n_points=100):
+def visualize_energy(log_Z, netE, n_points=100):
     x = np.linspace(-2, 2, n_points)
     y = np.linspace(-2, 2, n_points)
     grid = np.asarray(np.meshgrid(x, y)).transpose(1, 2, 0).reshape((-1, 2))
     grid = torch.from_numpy(grid).float().cuda()
     energies = netE(grid).detach().cpu().numpy()
     e_grid = energies.reshape((n_points, n_points))
-    p_grid = np.exp(-e_grid) / Z
+    p_grid = np.exp(- e_grid - log_Z)
 
     plt.clf()
     plt.imshow(e_grid, origin='lower')
@@ -124,17 +124,17 @@ for iters in range(args.iters):
         netE.zero_grad()
         D_real = netE(x_real)
         D_real = D_real.mean()
-        (args.lamda * D_real).backward()
+        D_real.backward()
 
         # train with fake
         z = torch.randn(args.batch_size, args.z_dim).cuda()
         x_fake = netG(z).detach()
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()
-        (args.lamda * -D_fake).backward()
+        (-D_fake).backward()
 
-        data = torch.cat([x_real, x_fake], 0)
-        score_matching_loss = nn.MSELoss()(
+        data = x_fake
+        score_matching_loss = args.lamda * nn.MSELoss()(
             calc_reconstruction(netE, data, args.sigma),
             data
         )
@@ -153,8 +153,8 @@ for iters in range(args.iters):
                np.asarray(g_costs)[-100:].mean(0),
                (time.time() - start_time) / 100
               ))
-        Z = sample(netE, netG, args.n_points)
-        visualize_energy(Z, netE, 500)
+        log_Z = sample(netE, netG, args.n_points)
+        visualize_energy(log_Z, netE, 500)
 
         start_time = time.time()
 

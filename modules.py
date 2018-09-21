@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils import weight_norm
 
 
 def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
