@@ -69,11 +69,11 @@ netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netE.load_state_dict(torch.load('toy_models/ebm_netE_%s.pt' % args.dataset))
 netG.load_state_dict(torch.load('toy_models/ebm_netG_%s.pt' % args.dataset))
 
-# x = torch.zeros(args.n_points, 2).cuda()
-# x.data.uniform_(-2, 2)
+x = torch.zeros(args.n_points, 2).cuda()
+x.data.uniform_(-2, 2)
 
-z = torch.randn(args.n_points, args.z_dim).cuda()
-x = netG(z).detach()
+# z = torch.randn(args.n_points, args.z_dim).cuda()
+# x = netG(z).detach()
 
 images = []
 for i in tqdm(range(1, 251)):
