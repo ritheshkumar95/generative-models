@@ -86,8 +86,8 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
-schedule = np.linspace(2., 0.001, 10000).tolist() + [.001] * (args.iters-10000)
-print(schedule)
+# schedule = np.linspace(1., 0.001, 10000).tolist() + [.001] * (args.iters-10000)
+# print(schedule)
 
 start_time = time.time()
 for iters in range(args.iters):
@@ -101,7 +101,7 @@ for iters in range(args.iters):
     x_fake = netG(z)
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    (args.entropy_coeff * D_fake).backward(retain_graph=True)
+    D_fake.backward(retain_graph=True)
 
     x = netD(x_fake)
     scores = (z[:, None] * x[None]).sum(-1)
