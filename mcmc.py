@@ -7,6 +7,7 @@ from tqdm import tqdm
 from modules import MLP_Discriminator
 from modules import calc_reconstruction
 from data import inf_train_gen
+from imageio import imread, mimwrite
 
 
 def log_sum_exp(vec):
@@ -69,7 +70,8 @@ netE.load_state_dict(torch.load('toy_models/ebm_netE_%s.pt' % args.dataset))
 x = torch.zeros(args.n_points, 2).cuda()
 x.data.uniform_(-2, 2)
 
-for i in tqdm(range(1, 501)):
+images = []
+for i in tqdm(range(1, 251)):
     x.requires_grad_(True)
     e_x = netE(x)
     score = torch.autograd.grad(
@@ -85,4 +87,10 @@ for i in tqdm(range(1, 501)):
         img = x.cpu().numpy()
         plt.clf()
         plt.scatter(img[:, 0], img[:, 1])
+        plt.title("Iter %d" % i)
+        plt.xlim(-2, 2)
+        plt.ylim(-2, 2)
         plt.savefig('mcmc_samples/image_%05d.png' % i)
+        images.append(imread('mcmc_samples/image_%05d.png' % i))
+
+mimwrite('mcmc.gif', images)

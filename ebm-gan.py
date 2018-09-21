@@ -101,7 +101,7 @@ for iters in range(args.iters):
     x_fake = netG(z)
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    (args.entropy_coeff * D_fake).backward(retain_graph=True)
+    D_fake.backward(retain_graph=True)
 
     x = netD(x_fake)
     scores = (z[:, None] * x[None]).sum(-1)
