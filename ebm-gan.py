@@ -23,7 +23,7 @@ def sample(netE, netG, n_points=10 ** 3):
     x_fake = x_fake.cpu().numpy()
     plt.clf()
     plt.scatter(x_fake[:, 0], x_fake[:, 1])
-    plt.savefig('ebm_samples_%s.png' % args.dataset)
+    plt.savefig('toy_samples/ebm_samples_%s.png' % args.dataset)
     return Z
 
 
@@ -39,12 +39,12 @@ def visualize_energy(Z, netE, n_points=100):
     plt.clf()
     plt.imshow(e_grid, origin='lower')
     plt.colorbar()
-    plt.savefig('ebm_energies_%s.png' % args.dataset)
+    plt.savefig('toy_samples/ebm_energies_%s.png' % args.dataset)
 
     plt.clf()
     plt.imshow(p_grid, origin='lower')
     plt.colorbar()
-    plt.savefig('ebm_densities_%s.png' % args.dataset)
+    plt.savefig('toy_samples/ebm_densities_%s.png' % args.dataset)
 
 
 def parse_args():
@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.01)
-    parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--lamda', type=float, default=1.)
     parser.add_argument('--entropy_coeff', type=float, default=1.)
 
     parser.add_argument('--n_points', type=int, default=10 ** 3)
@@ -86,8 +86,6 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
-one = torch.tensor(1., dtype=torch.float32).cuda()
-mone = one * -1
 label = torch.ones(2 * args.batch_size).float().cuda()
 label[args.batch_size:].zero_()
 
@@ -103,18 +101,7 @@ for iters in range(args.iters):
     x_fake = netG(z)
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-    D_fake.backward(one, retain_graph=True)
-
-    # z_bar = z.clone()[torch.randperm(z.size(0))]
-    # orig_x_z = torch.cat([x_fake, z], -1)
-    # shuf_x_z = torch.cat([x_fake, z_bar], -1)
-    # concat_x_z = torch.cat([orig_x_z, shuf_x_z], 0)
-
-    # logits = netD(concat_x_z).squeeze()
-    # mi_estimate = args.entropy_coeff * nn.BCEWithLogitsLoss()(
-    #     logits.squeeze(), label
-    # )
-    # mi_estimate.backward()
+    (args.entropy_coeff * D_fake).backward(retain_graph=True)
 
     x = netD(x_fake)
     scores = (z[:, None] * x[None]).sum(-1)
@@ -137,14 +124,14 @@ for iters in range(args.iters):
         netE.zero_grad()
         D_real = netE(x_real)
         D_real = D_real.mean()
-        D_real.backward(one)
+        D_real.backward()
 
         # train with fake
         z = torch.randn(args.batch_size, args.z_dim).cuda()
         x_fake = netG(z).detach()
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()
-        D_fake.backward(mone)
+        (-D_fake).backward()
 
         data = torch.cat([x_real, x_fake], 0)
         score_matching_loss = args.lamda * nn.MSELoss()(
@@ -170,3 +157,7 @@ for iters in range(args.iters):
         visualize_energy(Z, netE, 500)
 
         start_time = time.time()
+
+    if iters % 1000 == 0:
+        torch.save(netG.state_dict(), 'toy_models/ebm_netG_%s.pt' % args.dataset)
+        torch.save(netE.state_dict(), 'toy_models/ebm_netE_%s.pt' % args.dataset)
