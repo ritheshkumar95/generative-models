@@ -63,4 +63,3 @@ for i in tqdm(range(1, 251)):
         images.append(imread('mcmc_samples/image_%05d.png' % i))
 
 mimwrite('mcmc.gif', images)
-
