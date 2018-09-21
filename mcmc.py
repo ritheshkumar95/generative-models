@@ -93,6 +93,9 @@ for i in tqdm(range(1, 251)):
         img = x.cpu().numpy()
         plt.clf()
         plt.scatter(img[:, 0], img[:, 1])
+        plt.title("Iter %d" % i)
+        plt.xlim(-2, 2)
+        plt.ylim(-2, 2)
         plt.savefig('mcmc_samples/image_%05d.png' % i)
         images.append(imread('mcmc_samples/image_%05d.png' % i))
 

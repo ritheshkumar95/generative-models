@@ -103,19 +103,19 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(retain_graph=True)
 
-    x = netD(x_fake)
-    scores = (z[:, None] * x[None]).sum(-1)
-    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-        scores,
-        torch.arange(args.batch_size, dtype=torch.int64).cuda()
-    )
-    mi_estimate.backward()
+    # x = netD(x_fake)
+    # scores = (z[:, None] * x[None]).sum(-1)
+    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+    #     scores,
+    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    # )
+    # mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
     g_costs.append(
-        [D_fake.item(), mi_estimate.item()]
+        [D_fake.item()]
     )
 
     for i in range(args.critic_iters):
@@ -124,17 +124,17 @@ for iters in range(args.iters):
         netE.zero_grad()
         D_real = netE(x_real)
         D_real = D_real.mean()
-        D_real.backward()
+        (args.lamda * D_real).backward()
 
         # train with fake
         z = torch.randn(args.batch_size, args.z_dim).cuda()
         x_fake = netG(z).detach()
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()
-        (-D_fake).backward()
+        (args.lamda * -D_fake).backward()
 
         data = torch.cat([x_real, x_fake], 0)
-        score_matching_loss = args.lamda * nn.MSELoss()(
+        score_matching_loss = nn.MSELoss()(
             calc_reconstruction(netE, data, args.sigma),
             data
         )
