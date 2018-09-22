@@ -32,7 +32,7 @@ class Generator(nn.Module):
     def __init__(self, z_dim=128, dim=512):
         super(Generator, self).__init__()
         self.expand = nn.Linear(z_dim, 4 * 4 * dim)
-            
+
         self.main = nn.Sequential(
             nn.ConvTranspose2d(dim, dim // 2, 4, 2, 1),
             nn.BatchNorm2d(dim // 2),
