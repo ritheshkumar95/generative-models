@@ -97,10 +97,17 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.1, inplace=True)
         )
         self.expand = nn.Linear(4 * 4 * dim, z_dim)
+        self.classify = nn.Sequential(
+            nn.Linear(2 * z_dim, dim),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(dim, 1),
+        )
 
-    def forward(self, x):
+    def forward(self, x, z):
         out = self.main(x).view(x.size(0), -1)
-        return self.expand(out)
+        out = self.expand(out)
+        out = torch.cat([out, z], -1)
+        return self.classify(out)
 
 
 if __name__ == '__main__':

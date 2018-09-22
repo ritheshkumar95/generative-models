@@ -88,13 +88,28 @@ for iters in range(1, args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(one, retain_graph=True)
 
-    x = netD(x_fake)
-    score = (z[:, None] * x[None]).sum(-1)
-    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-        score,
-        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    ##########################################
+    # DeepInfoMAX for MI estimation
+    ##########################################
+    z_bar = z[torch.randperm(args.batch_size)]
+    concat_x = torch.cat([x_fake, x_fake], 0)
+    concat_z = torch.cat([z, z_bar], 0)
+    mi_estimate = args.entropy_coeff * nn.BCEWithLogitsLoss()(
+        netD(concat_x, concat_z).squeeze(),
+        label
     )
     mi_estimate.backward()
+
+    ##########################################
+    # CPC for MI estimation
+    ##########################################
+    # x = netD(x_fake)
+    # scores = (z[:, None] * x[None]).sum(-1)
+    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+    #     scores,
+    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    # )
+    # mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
