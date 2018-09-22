@@ -42,8 +42,8 @@ save_image(orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack)
 netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
 netD = Discriminator(args.n_stack, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -88,16 +88,19 @@ for iters in range(1, args.iters + 1):
         wass_dist.append(Wasserstein_D.item())
         d_costs.append([D_real.item(), D_fake.item()])
 
-    if iters % 500 == 0:
+    if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
               'Wass_D: {:5.3f} D_costs: {} Time: {:5.3f}'.format(
                iters, args.iters,
-               (500. * iters) / args.iters,
+               (100. * iters) / args.iters,
                np.mean(wass_dist), np.asarray(d_costs).mean(0),
-               (time.time() - start_time) / 500
+               (time.time() - start_time) / 100
               ))
         sample(netG)
-        torch.save(netG.state_dict(), 'models/wgan-gp_MNIST_%d.pt' % args.n_stack)
         g_costs = []
         wass_dist = []
         start_time = time.time()
+
+    if iters % 1000 == 0:
+        torch.save(netG.state_dict(), 'models/wgan-gp_netG_MNIST_%d.pt' % args.n_stack)
+        torch.save(netD.state_dict(), 'models/wgan-gp_netD_MNIST_%d.pt' % args.n_stack)
