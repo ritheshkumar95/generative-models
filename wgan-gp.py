@@ -29,7 +29,7 @@ def inf_train_gen(batch_size):
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples/wgan-gp-fast_%s.png' % args.dataset, normalize=True)
+    save_image(x_fake, 'samples/wgan-gp_%s.png' % args.dataset, normalize=True)
 
 
 def parse_args():
@@ -118,7 +118,6 @@ for iters in range(1, args.iters + 1):
         sample(netG)
         netG.train()
 
-        torch.save(netG.state_dict(), 'models/wgan-gp-fast_%s.pt' % args.dataset)
         g_costs = []
         wass_dist = []
         start_time = time.time()
@@ -133,3 +132,6 @@ for iters in range(1, args.iters + 1):
         ))
         print("-" * 100)
         netG.train()
+
+        torch.save(netG.state_dict(), 'models/wgan-gp_netG_%s.pt' % args.dataset)
+        torch.save(netD.state_dict(), 'models/wgan-gp_netD_%s.pt' % args.dataset)
