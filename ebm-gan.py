@@ -145,10 +145,10 @@ for iters in range(1, args.iters + 1):
     if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
               'D_costs: {} G_costs: {} Time: {:5.3f}'.format(
-               iters, args.iters, (50. * iters) / args.iters,
+               iters, args.iters, (100. * iters) / args.iters,
                np.asarray(d_costs).mean(0),
                np.asarray(g_costs).mean(0),
-               (time.time() - start_time) / 50
+               (time.time() - start_time) / 100
               ))
         sample(netG)
         torch.save(netG.state_dict(), 'anomaly_models/ebm_MNIST_netG.pt')
@@ -157,5 +157,5 @@ for iters in range(1, args.iters + 1):
         g_costs = []
         start_time = time.time()
 
-    if iters % 200 == 0:
+    if iters % 500 == 0:
         calc_scores(netE)
