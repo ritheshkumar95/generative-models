@@ -5,7 +5,6 @@ import torch
 from tqdm import tqdm
 
 from modules import MLP_Discriminator, MLP_Generator
-from modules import calc_reconstruction
 from data import inf_train_gen
 from imageio import imread, mimwrite
 
@@ -29,8 +28,8 @@ args = parse_args()
 
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
-netE.load_state_dict(torch.load('toy_models/wgan-gp_netE_%s.pt' % args.dataset))
-netG.load_state_dict(torch.load('toy_models/wgan-gp_netG_%s.pt' % args.dataset))
+netE.load_state_dict(torch.load('toy_models/ebm_netE_%s.pt' % args.dataset))
+netG.load_state_dict(torch.load('toy_models/ebm_netG_%s.pt' % args.dataset))
 
 x = torch.zeros(args.n_points, 2).cuda()
 x.data.uniform_(-2, 2)
@@ -41,7 +40,7 @@ x.data.uniform_(-2, 2)
 images = []
 for i in tqdm(range(1, 251)):
     x.requires_grad_(True)
-    e_x = -netE(x)
+    e_x = netE(x)
     score = torch.autograd.grad(
         outputs=e_x, inputs=x,
         grad_outputs=torch.ones_like(e_x),
