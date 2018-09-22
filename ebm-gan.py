@@ -8,27 +8,56 @@ from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, Classifier
 from modules import calc_reconstruction
-from data import inf_train_gen
+import data.mnist as data
+from utils.evaluations import do_prc
+
+
+def inf_train_gen(label, batch_size):
+    trainx, trainy = data.get_train(label, True)
+    while True:
+        for i in range(0, trainx.shape[0], batch_size):
+            x = torch.from_numpy(trainx[i:i + batch_size]).cuda()
+            yield x.squeeze()[:, None]
+
+
+def test_gen(label, batch_size):
+    testx, testy = data.get_test(label, True)
+    for i in range(0, testx.shape[0], batch_size):
+        x = torch.from_numpy(testx[i:i + batch_size]).cuda()
+        y = torch.from_numpy(testy[i:i + batch_size]).cuda()
+        yield x.squeeze()[:, None], y
+
+
+def calc_scores(netE):
+    itr = test_gen(args.label, args.batch_size)
+    scores = []
+    gts = []
+    for i, (img, labels) in enumerate(itr):
+        scores += (-netE(img).squeeze()).detach().cpu().tolist()
+        gts += labels.cpu().tolist()
+
+    prc_auc = do_prc(scores, gts)
+    print('PRC AUC = %f' % prc_auc)
 
 
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
     save_image(
-        x_fake[:, :3], 'samples/ebm_MNIST_%d.png' % args.n_stack,
+        x_fake, 'samples/ebm_MNIST.png',
         nrow=8, normalize=True
     )
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_stack', type=int, default=1)
-
+    parser.add_argument('--label', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--sigma', type=float, default=.01)
     parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
@@ -37,35 +66,32 @@ def parse_args():
 
 
 args = parse_args()
-itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
+itr = inf_train_gen(args.label, args.batch_size)
 
 #####################
 # Dump Original Data
 #####################
 orig_data = itr.__next__()
 save_image(
-    orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack,
+    orig_data, 'samples/orig_MNIST.png',
     nrow=8, normalize=True
 )
 
-netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
-netE = Discriminator(args.n_stack, args.dim).cuda()
-netD = Classifier(args.n_stack, args.z_dim, args.dim).cuda()
+netG = Generator(1, args.z_dim, args.dim).cuda()
+netE = Discriminator(1, args.dim).cuda()
+netD = Classifier(1, args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
 
-label = torch.ones(2 * args.batch_size).float().cuda()
-label[args.batch_size:].zero_()
-
 start_time = time.time()
 d_costs = []
 g_costs = []
-for iters in range(args.iters):
+for iters in range(1, args.iters + 1):
     netG.zero_grad()
     netD.zero_grad()
 
@@ -75,26 +101,23 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(one, retain_graph=True)
 
-    # z_bar = z.clone()[torch.randperm(z.size(0))]
-    # concat_x = torch.cat([x_fake, x_fake], 0)
-    # concat_z = torch.cat([z, z_bar], 0)
-
-    # logits = netD(concat_x, concat_z)
-    # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    # dim_estimate.backward()
+    x = netD(x_fake)
+    score = (z[:, None] * x[None]).sum(-1)
+    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+        score,
+        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    )
+    mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
 
-    # g_costs.append(
-    #     [D_fake.item(), dim_estimate.item()]
-    # )
     g_costs.append(
-        [D_fake.item()]
+        [D_fake.item(), mi_estimate.item()]
     )
 
     for i in range(args.critic_iters):
-        x_real = itr.__next__().cuda()
+        x_real = itr.__next__()
 
         netE.zero_grad()
         D_real = netE(x_real)
@@ -108,10 +131,9 @@ for iters in range(args.iters):
         D_fake = D_fake.mean()
         D_fake.backward(mone)
 
-        data = torch.cat([x_real, x_fake], 0)
         score_matching_loss = args.lamda * nn.MSELoss()(
-            calc_reconstruction(netE, data, args.sigma),
-            data
+            calc_reconstruction(netE, x_fake, args.sigma),
+            x_fake
         )
         score_matching_loss.backward()
 
@@ -120,7 +142,7 @@ for iters in range(args.iters):
             [D_real.item(), D_fake.item(), score_matching_loss.item()]
         )
 
-    if iters % 50 == 0:
+    if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
               'D_costs: {} G_costs: {} Time: {:5.3f}'.format(
                iters, args.iters, (50. * iters) / args.iters,
@@ -129,7 +151,11 @@ for iters in range(args.iters):
                (time.time() - start_time) / 50
               ))
         sample(netG)
-        torch.save(netG.state_dict(), 'models/ebm_MNIST_%d.pt' % args.n_stack)
+        torch.save(netG.state_dict(), 'anomaly_models/ebm_MNIST_netG.pt')
+        torch.save(netE.state_dict(), 'anomaly_models/ebm_MNIST_netE.pt')
         d_costs = []
         g_costs = []
         start_time = time.time()
+
+    if iters % 200 == 0:
+        calc_scores(netE)
