@@ -19,14 +19,15 @@ def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
 
 def calc_reconstruction(netE, data, sigma):
     data.requires_grad_(True)
-    noisy_data = data + torch.normal(0, torch.ones_like(data) * sigma)
+    # noisy_data = data + torch.normal(0, torch.ones_like(data) * sigma)
+    noisy_data = data
     energy = netE(noisy_data)
     score = torch.autograd.grad(
         outputs=energy, inputs=noisy_data,
         grad_outputs=torch.ones_like(energy),
         create_graph=True, retain_graph=True, only_inputs=True
     )[0]
-    return noisy_data - sigma ** 2 * score
+    return noisy_data - sigma * score
 
 
 class MLP_Generator(nn.Module):

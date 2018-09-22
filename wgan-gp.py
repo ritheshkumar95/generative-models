@@ -8,26 +8,42 @@ from modules import MLP_Generator, MLP_Discriminator, calc_gradient_penalty
 from data import inf_train_gen
 
 
-def sample(netG, n_points):
+def log_sum_exp(vec):
+    max_val = vec.max()[0]
+    return max_val + (vec - max_val).exp().sum().log()
+
+
+def sample(netE, netG, n_points):
     z = torch.randn(n_points, args.z_dim).cuda()
-    x_fake = netG(z).detach().cpu().numpy()
+    x_fake = netG(z)
+    neg_e_x = netE(x_fake)
+    log_z = log_sum_exp(neg_e_x.squeeze()).item()
+
+    x_fake = x_fake.detach().cpu().numpy()
     plt.clf()
     plt.scatter(x_fake[:, 0], x_fake[:, 1])
-    plt.savefig('samples.png')
+    plt.savefig('toy_samples/wgan-gp_samples_%s.png' % args.dataset)
+    return log_z
 
 
-def visualize_energy(netE, n_points=100):
+def visualize_energy(log_z, netE, n_points=100):
     x = np.linspace(-2, 2, n_points)
     y = np.linspace(-2, 2, n_points)
     grid = np.asarray(np.meshgrid(x, y)).transpose(1, 2, 0).reshape((-1, 2))
     grid = torch.from_numpy(grid).float().cuda()
     energies = netE(grid).detach().cpu().numpy()
-    e_grid = energies.reshape((n_points, n_points))
+    e_grid = -energies.reshape((n_points, n_points))
+    p_grid = np.exp(- e_grid - log_z)
 
     plt.clf()
     plt.imshow(e_grid, origin='lower')
     plt.colorbar()
-    plt.savefig('energies.png')
+    plt.savefig('toy_samples/wgan-gp_energies_%s.png' % args.dataset)
+
+    plt.clf()
+    plt.imshow(p_grid, origin='lower')
+    plt.colorbar()
+    plt.savefig('toy_samples/wgan-gp_densities_%s.png' % args.dataset)
 
 
 def parse_args():
@@ -56,13 +72,13 @@ itr = inf_train_gen(args.dataset, args.batch_size)
 orig_data = inf_train_gen(args.dataset, args.n_points).__next__()
 plt.clf()
 plt.scatter(orig_data[:, 0], orig_data[:, 1])
-plt.savefig('orig_samples.png')
+plt.savefig('orig_samples_%s.png' % args.dataset)
 
 netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
 netD = MLP_Discriminator(args.input_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=2e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9), amsgrad=True)
 
 one = torch.tensor(1., dtype=torch.float32).cuda()
 mone = one * -1
@@ -117,5 +133,15 @@ for iters in range(args.iters):
               ))
         start_time = time.time()
 
-        sample(netG, args.n_points)
-        visualize_energy(netD)
+        log_z = sample(netD, netG, args.n_points)
+        visualize_energy(log_z, netD)
+
+    if iters % 1000 == 0:
+        torch.save(
+            netG.state_dict(),
+            'toy_models/wgan-gp_netG_%s.pt' % args.dataset
+        )
+        torch.save(
+            netD.state_dict(),
+            'toy_models/wgan-gp_netE_%s.pt' % args.dataset
+        )

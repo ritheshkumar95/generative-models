@@ -29,8 +29,8 @@ args = parse_args()
 
 netE = MLP_Discriminator(args.input_dim, args.dim).cuda()
 netG = MLP_Generator(args.input_dim, args.z_dim, args.dim).cuda()
-netE.load_state_dict(torch.load('toy_models/ebm_netE_%s.pt' % args.dataset))
-netG.load_state_dict(torch.load('toy_models/ebm_netG_%s.pt' % args.dataset))
+netE.load_state_dict(torch.load('toy_models/wgan-gp_netE_%s.pt' % args.dataset))
+netG.load_state_dict(torch.load('toy_models/wgan-gp_netG_%s.pt' % args.dataset))
 
 x = torch.zeros(args.n_points, 2).cuda()
 x.data.uniform_(-2, 2)
@@ -41,13 +41,13 @@ x.data.uniform_(-2, 2)
 images = []
 for i in tqdm(range(1, 251)):
     x.requires_grad_(True)
-    e_x = netE(x)
+    e_x = -netE(x)
     score = torch.autograd.grad(
         outputs=e_x, inputs=x,
         grad_outputs=torch.ones_like(e_x),
         create_graph=True, retain_graph=False, only_inputs=True
     )[0]
-    score = score / torch.norm(score.view(x.size(0), -1), 2, dim=-1, keepdim=True)
+    # score = score / torch.norm(score.view(x.size(0), -1), 2, dim=-1, keepdim=True)
 
     noise = torch.normal(0, torch.ones_like(x) * args.lamda2).cuda()
     x = (x - args.lamda1 * score + noise).detach()
