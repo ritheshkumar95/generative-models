@@ -8,7 +8,7 @@ from torchvision.utils import save_image
 from torchvision import datasets, transforms
 
 from modules import Generator, Discriminator, Classifier
-from modules import calc_reconstruction
+from modules import calc_penalty
 from eval import tf_inception_score
 
 
@@ -39,8 +39,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--sigma', type=float, required=True)
-    parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--lamda', type=float, default=10)
     parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
@@ -89,14 +88,6 @@ for iters in range(1, args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(one, retain_graph=True)
 
-    # z_bar = z.clone()[torch.randperm(z.size(0))]
-    # concat_x = torch.cat([x_fake, x_fake], 0)
-    # concat_z = torch.cat([z, z_bar], 0)
-
-    # logits = netD(concat_x, concat_z)
-    # dim_estimate = nn.BCEWithLogitsLoss()(logits.squeeze(), label)
-    # dim_estimate.backward()
-
     x = netD(x_fake)
     score = (z[:, None] * x[None]).sum(-1)
     mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
@@ -127,16 +118,12 @@ for iters in range(1, args.iters):
         D_fake = D_fake.mean()
         D_fake.backward(mone)
 
-        data = torch.cat([x_real, x_fake], 0)
-        score_matching_loss = args.lamda * nn.MSELoss()(
-            calc_reconstruction(netE, data, args.sigma),
-            data
-        )
-        score_matching_loss.backward()
+        penalty = calc_penalty(netE, x_real, args.lamda)
+        penalty.backward()
 
         optimizerE.step()
         d_costs.append(
-            [D_real.item(), D_fake.item(), score_matching_loss.item()]
+            [D_real.item(), D_fake.item(), penalty.item()]
         )
 
     if iters % 100 == 0:
