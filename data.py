@@ -7,6 +7,7 @@ def inf_train_gen(batch_size, data_dir='../data/MNIST/raw', n_stack=3):
     fd = open(os.path.join(data_dir, 'train-images-idx3-ubyte'))
     loaded = np.fromfile(file=fd, dtype=np.uint8)
     mnist_X = loaded[16:].reshape((60000, 28, 28, 1)).astype(np.float)
+    np.random.seed(111)
 
     while True:
         ids = np.random.randint(

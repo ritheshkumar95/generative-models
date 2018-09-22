@@ -16,6 +16,36 @@ def KLD(p, q):
     return sum(_p * log(_p/_q) for (_p, _q) in zip(p, q) if _p != 0)
 
 
+class ModeCollapseEval(object):
+    def __init__(self, n_stack, z_dim):
+        self.classifier = Net().cuda()
+        self.classifier.load_state_dict(torch.load('models/pretrained_classifier.pt'))
+        self.n_stack = n_stack
+        self.n_samples = 10 ** (n_stack + 1)
+        self.z_dim = z_dim
+
+    def count_modes(self, netG):
+        counts = np.zeros([10] * self.n_stack)
+        n_batches = max(1, self.n_samples // 1000)
+        for i in tqdm(range(n_batches)):
+            with torch.no_grad():
+                z = torch.randn(1000, self.z_dim).cuda()
+                x_fake = netG(z) * .5 + .5
+                x_fake = x_fake.view(-1, 1, 28, 28)
+                classes = F.softmax(self.classifier(x_fake), -1).max(1)[1]
+                classes = classes.view(1000, self.n_stack).cpu().numpy()
+
+                for line in classes:
+                    counts[tuple(line)] += 1
+
+
+        n_modes = 10 ** self.n_stack
+        true_data = np.ones(n_modes) / float(n_modes)
+        print("No. of modes captured: ", len(np.where(counts > 0)[0]))
+        counts = counts.flatten() / counts.sum()
+        print('Reverse KL: ', KLD(counts, true_data))
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--load_path', required=True)
@@ -27,29 +57,12 @@ def parse_args():
     return args
 
 
-args = parse_args()
-netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
-netG.load_state_dict(torch.load(args.load_path))
-netG.eval()
+if __name__ == '__main__':
+    args = parse_args()
+    netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
+    netG.load_state_dict(torch.load(args.load_path))
+    netG.eval()
 
-classifier = Net().cuda()
-classifier.load_state_dict(torch.load('models/pretrained_classifier.pt'))
+    evals = ModeCollapseEval(args.n_stack, args.z_dim)
+    evals.count_modes(netG)
 
-counts = np.zeros([10] * args.n_stack)
-for i in tqdm(range(260)):
-    with torch.no_grad():
-        z = torch.randn(100, args.z_dim).cuda()
-        x_fake = netG(z) * .5 + .5
-        x_fake = x_fake.view(-1, 1, 28, 28)
-        classes = F.softmax(classifier(x_fake), -1).max(1)[1]
-        classes = classes.view(100, args.n_stack).cpu().numpy()
-
-        for line in classes:
-            counts[tuple(line)] += 1
-
-
-n_modes = 10 ** args.n_stack
-true_data = np.ones(n_modes) / float(n_modes)
-print("No. of modes captured: ", len(np.where(counts > 0)[0]))
-counts = counts.flatten() / counts.sum()
-print('Reverse KL: ', KLD(counts, true_data))
