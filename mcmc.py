@@ -50,8 +50,10 @@ for i in tqdm(range(1, 101)):
     # magnitude = score.view(score.size(0), -1).norm(2, dim=-1)
     # direction = score / magnitude[:, None, None, None]
 
-    noise = torch.normal(0, torch.ones_like(z) * args.lamda2).cuda()
+    # noise = torch.normal(0, torch.ones_like(x) * args.lamda2).cuda()
     # x = (x - args.lamda1 * score + noise).detach()
+
+    noise = torch.normal(0, torch.ones_like(z) * args.lamda2).cuda()
     z = (z - args.lamda1 * score + noise).detach()
 
     print("Energy: %f" % e_x.mean().item())

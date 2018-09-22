@@ -154,7 +154,8 @@ for iters in range(1, args.iters):
         sample(netG)
         netG.train()
 
-        torch.save(netG.state_dict(), 'models/ebm-fast_%s.pt' % args.dataset)
+        torch.save(netG.state_dict(), 'models/ebm_netG_%s.pt' % args.dataset)
+        torch.save(netE.state_dict(), 'models/ebm_netE_%s.pt' % args.dataset)
         d_costs = []
         g_costs = []
         start_time = time.time()
