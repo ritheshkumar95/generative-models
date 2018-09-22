@@ -85,6 +85,8 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
+label = torch.zeros(2 * args.batch_size).cuda()
+label[:args.batch_size].data.fill_(1)
 
 start_time = time.time()
 for iters in range(args.iters):
@@ -100,13 +102,28 @@ for iters in range(args.iters):
     D_fake = D_fake.mean()
     D_fake.backward(retain_graph=True)
 
-    x = netD(x_fake)
-    scores = (z[:, None] * x[None]).sum(-1)
-    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-        scores,
-        torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    ##########################################
+    # DeepInfoMAX for MI estimation
+    ##########################################
+    z_bar = z[torch.randperm(args.batch_size)]
+    joint = torch.cat([x_fake, z], -1)
+    marginal = torch.cat([x_fake, z_bar], -1)
+    mi_estimate = args.entropy_coeff * nn.BCEWithLogitsLoss()(
+        netD(torch.cat([joint, marginal], 0)).squeeze(),
+        label
     )
     mi_estimate.backward()
+
+    ##########################################
+    # CPC for MI estimation
+    ##########################################
+    # x = netD(x_fake)
+    # scores = (z[:, None] * x[None]).sum(-1)
+    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
+    #     scores,
+    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
+    # )
+    # mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
