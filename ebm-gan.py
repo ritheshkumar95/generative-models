@@ -88,10 +88,12 @@ optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 label = torch.zeros(2 * args.batch_size).cuda()
 label[:args.batch_size].data.fill_(1)
 
+schedule = np.linspace(1., 0.001, 25000).tolist() + [.001 * (args.iters - 25000)]
+
 start_time = time.time()
+d_costs = []
+g_costs = []
 for iters in range(args.iters):
-    d_costs = []
-    g_costs = []
 
     netG.zero_grad()
     netD.zero_grad()
@@ -108,7 +110,7 @@ for iters in range(args.iters):
     z_bar = z[torch.randperm(args.batch_size)]
     joint = torch.cat([x_fake, z], -1)
     marginal = torch.cat([x_fake, z_bar], -1)
-    mi_estimate = args.entropy_coeff * nn.BCEWithLogitsLoss()(
+    mi_estimate = schedule[iters] * nn.BCEWithLogitsLoss()(
         netD(torch.cat([joint, marginal], 0)).squeeze(),
         label
     )
