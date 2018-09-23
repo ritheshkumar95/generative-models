@@ -20,6 +20,25 @@ def inf_train_gen(dataset, batch_size):
             for i in range(len(dataset) // batch_size):
                 yield dataset[i * batch_size:(i+1) * batch_size]
 
+    elif dataset == '20gaussians':
+        dataset = []
+        drop_modes = [(-1, -1), (-1, 1), (1, -1), (1, 1), (0, 0)]
+        for x in range(-2, 3):
+            for y in range(-2, 3):
+                if (x, y) in drop_modes:
+                    continue
+                for i in range(100000//25):
+                    point = np.random.randn(2)*0.05
+                    point[0] += 2*x
+                    point[1] += 2*y
+                    dataset.append(point)
+        dataset = np.array(dataset, dtype='float32')
+        np.random.shuffle(dataset)
+        dataset /= 2.828  # stdev
+        while True:
+            for i in range(len(dataset) // batch_size):
+                yield dataset[i * batch_size:(i+1) * batch_size]
+
     elif dataset == 'swissroll':
         while True:
             data = make_swiss_roll(
