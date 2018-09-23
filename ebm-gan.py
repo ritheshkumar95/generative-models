@@ -88,7 +88,7 @@ optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 label = torch.zeros(2 * args.batch_size).cuda()
 label[:args.batch_size].data.fill_(1)
 
-schedule = np.linspace(1., 0.001, 25000).tolist() + [.001 * (args.iters - 25000)]
+schedule = np.linspace(1., 0.001, 25000).tolist() + [.001] * (args.iters - 25000)
 
 start_time = time.time()
 d_costs = []
