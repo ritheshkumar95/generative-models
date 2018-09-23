@@ -26,8 +26,8 @@ args = parse_args()
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
 
-netD.load_state_dict(torch.load('models/wgan-gp_netD_CIFAR10.pt'))
-netG.load_state_dict(torch.load('models/wgan-gp_netG_CIFAR10.pt'))
+netD.load_state_dict(torch.load('models/ebm_netE_CIFAR10.pt'))
+netG.load_state_dict(torch.load('models/ebm_netG_CIFAR10.pt'))
 
 # x = torch.zeros(args.n_points, args.n_stack, 28, 28).cuda()
 # x.data.uniform_(-1, 1)
@@ -39,7 +39,7 @@ for i in tqdm(range(1, 101)):
     z.requires_grad_(True)
     x = netG(z)
     # x.requires_grad_(True)
-    e_x = -netD(x)
+    e_x = netD(x)
 
     score = torch.autograd.grad(
         outputs=e_x, inputs=z,
