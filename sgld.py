@@ -19,8 +19,7 @@ def parse_args():
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
 
-    parser.add_argument('--lamda1', type=float, default=.01)
-    parser.add_argument('--lamda2', type=float, default=.01)
+    parser.add_argument('--sigma', type=float, default=.01)
     args = parser.parse_args()
     return args
 
@@ -34,12 +33,7 @@ netD = Discriminator(args.dim).cuda()
 netD.load_state_dict(torch.load('models/ebm_netE_CIFAR10.pt'))
 netG.load_state_dict(torch.load('models/ebm_netG_CIFAR10.pt'))
 
-# x = torch.zeros(args.n_points, args.n_stack, 28, 28).cuda()
-# x.data.uniform_(-1, 1)
-
-
 images = []
-
 for j in tqdm(range(50)):
     z = torch.randn(args.n_points, args.z_dim).cuda()
     for i in range(1, 1 + args.n_steps):
@@ -56,8 +50,8 @@ for j in tqdm(range(50)):
         # magnitude = score.view(score.size(0), -1).norm(2, dim=-1)
         # direction = score / magnitude[:, None, None, None]
 
-        noise = torch.normal(0, torch.ones_like(z) * args.lamda2).cuda()
-        z = (z - args.lamda1 * score + noise).detach()
+        noise = torch.randn_like(z) * np.sqrt(args.sigma * 2)
+        z = (z - args.sigma * score + noise).detach()
 
         # print("Energy: %f" % e_x.mean().item())
 
