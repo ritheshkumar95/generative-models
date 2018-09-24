@@ -31,7 +31,7 @@ def inf_train_gen(batch_size):
 def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
     x_fake = netG(z).detach().cpu()
-    save_image(x_fake, 'samples/ebm-fast_%s.png' % args.dataset, normalize=True)
+    save_image(x_fake, 'samples/ebm_%s.png' % args.dataset, normalize=True)
 
 
 def parse_args():
@@ -40,7 +40,6 @@ def parse_args():
     parser.add_argument('--iters', type=int, default=100000)
     parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--lamda', type=float, default=10)
-    parser.add_argument('--entropy_coeff', type=float, default=1)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
@@ -94,22 +93,11 @@ for iters in range(1, args.iters):
     z_bar = z[torch.randperm(args.batch_size)]
     concat_x = torch.cat([x_fake, x_fake], 0)
     concat_z = torch.cat([z, z_bar], 0)
-    mi_estimate = args.entropy_coeff * nn.BCEWithLogitsLoss()(
+    mi_estimate = nn.BCEWithLogitsLoss()(
         netD(concat_x, concat_z).squeeze(),
         label
     )
     mi_estimate.backward()
-
-    ##########################################
-    # CPC for MI estimation
-    ##########################################
-    # x = netD(x_fake)
-    # scores = (z[:, None] * x[None]).sum(-1)
-    # mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-    #     scores,
-    #     torch.arange(args.batch_size, dtype=torch.int64).cuda()
-    # )
-    # mi_estimate.backward()
 
     optimizerG.step()
     optimizerD.step()
