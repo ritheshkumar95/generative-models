@@ -62,7 +62,7 @@ for j in tqdm(range(50)):
     x = netG(z)
     images.append(x.detach().cpu().numpy())
     if args.v:
-        # mimwrite('mcmc.gif', images)
+        mimwrite('mcmc.gif', images)
         break
 
 

@@ -13,7 +13,7 @@ if __name__ == '__main__':
     netG.load_state_dict(torch.load(sys.argv[1]))
 
     all_samples = []
-    for i in tqdm(range(50)):
+    for i in tqdm(range(500)):
         samples_100 = torch.randn(100, 128).cuda()
         all_samples.append(
             netG(samples_100).detach().cpu().numpy()
