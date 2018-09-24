@@ -21,7 +21,7 @@ class ModeCollapseEval(object):
         self.classifier = Net().cuda()
         self.classifier.load_state_dict(torch.load('models/pretrained_classifier.pt'))
         self.n_stack = n_stack
-        self.n_samples = 10 ** (n_stack + 1)
+        self.n_samples = 26 * 10 ** n_stack
         self.z_dim = z_dim
 
     def count_modes(self, netG):
