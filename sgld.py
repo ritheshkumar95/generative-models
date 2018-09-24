@@ -1,11 +1,13 @@
 import argparse
 import torch
 from tqdm import tqdm
-
+import os
+import sys
 from torchvision.utils import save_image
 from modules import Discriminator, Generator
 from imageio import imread, mimwrite
 import numpy as np
+from scipy.misc import imsave
 
 
 def parse_args():
@@ -71,6 +73,12 @@ for j in tqdm(range(50)):
 
 
 if not args.v:
+    all_samples = np.concatenate(images, axis=0)
+    all_samples = (((all_samples * .5) + .5) * 255).astype('int32')
+
+    for i in tqdm(range(all_samples.shape[0])):
+        imsave('cifar_samples/image_%d.png' % i, all_samples[i].transpose(1, 2, 0))
+
     from inception_score import get_inception_score
     images = np.concatenate(images, axis=0)
     print(get_inception_score(images))
