@@ -12,11 +12,9 @@ from data import inf_train_gen
 from eval import ModeCollapseEval
 
 
-def sample(netG_le, netG_he, batch_size=32):
+def sample(netG, batch_size=64):
     z = torch.randn(batch_size, args.z_dim).cuda()
-    x_fake_le = netG_le(z).detach().cpu()
-    x_fake_he = netG_he(z).detach().cpu()
-    x_fake = torch.cat([x_fake_le, x_fake_he], 0)
+    x_fake = netG(z).detach().cpu()
     save_image(
         x_fake[:, :3], 'samples/ebm_MNIST_%d.png' % args.n_stack,
         nrow=8, normalize=True
@@ -38,7 +36,31 @@ def parse_args():
     return args
 
 
-def train_generator(netG, netD, optimizerG, optimizerD, g_costs, lamda):
+args = parse_args()
+itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
+
+#####################
+# Dump Original Data
+#####################
+orig_data = itr.__next__()
+save_image(
+    orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack,
+    nrow=8, normalize=True
+)
+
+netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
+netE = Discriminator(args.n_stack, args.dim).cuda()
+netD = Classifier(args.n_stack, args.z_dim, args.dim).cuda()
+evals = ModeCollapseEval(args.n_stack, args.z_dim)
+
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
+
+start_time = time.time()
+d_costs = []
+g_costs = []
+for iters in range(args.iters):
     netG.zero_grad()
     netD.zero_grad()
 
@@ -61,101 +83,58 @@ def train_generator(netG, netD, optimizerG, optimizerD, g_costs, lamda):
         netD(concat_x, concat_z).squeeze(),
         label
     )
-    (lamda * mi_estimate).backward()
+    mi_estimate.backward()
 
     optimizerG.step()
-    if optimizerD is not None:
-        optimizerD.step()
+    optimizerD.step()
 
     g_costs.append(
         [D_fake.item(), mi_estimate.item()]
     )
 
-
-def train_energy(netG, netE, optimizerE, d_costs):
-    x_real = itr.__next__().cuda()
-
-    netE.zero_grad()
-    D_real = netE(x_real)
-    D_real = D_real.mean()
-    D_real.backward()
-
-    # train with fake
-    z = torch.randn(args.batch_size, args.z_dim).cuda()
-    x_fake = netG(z).detach()
-    D_fake = netE(x_fake)
-    D_fake = D_fake.mean()
-    (-D_fake).backward()
-
-    penalty = calc_penalty(netE, x_real, args.lamda)
-    penalty.backward()
-
-    optimizerE.step()
-    d_costs.append(
-        [D_real.item(), D_fake.item(), penalty.item()]
-    )
-
-
-args = parse_args()
-itr = inf_train_gen(args.batch_size, n_stack=args.n_stack)
-
-#####################
-# Dump Original Data
-#####################
-orig_data = itr.__next__()
-save_image(
-    orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack,
-    nrow=8, normalize=True
-)
-
-netG_le = Generator(args.n_stack, args.z_dim, args.dim).cuda()
-netG_he = Generator(args.n_stack, args.z_dim, args.dim).cuda()
-netE = Discriminator(args.n_stack, args.dim).cuda()
-netD = Classifier(args.n_stack, args.z_dim, args.dim).cuda()
-evals = ModeCollapseEval(args.n_stack, args.z_dim)
-
-optimizerG_le = torch.optim.Adam(netG_le.parameters(), lr=1e-4, betas=(0.5, 0.9))
-optimizerG_he = torch.optim.Adam(netG_he.parameters(), lr=1e-4, betas=(0.5, 0.9))
-optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
-
-schedule = np.linspace(1., 0.001, 25000).tolist() + [.001] * (args.iters - 25000)
-
-start_time = time.time()
-d_costs = []
-g_le_costs = []
-g_he_costs = []
-for iters in range(args.iters):
-    train_generator(netG_he, netD, optimizerG_he, optimizerD, g_he_costs, 1.)
-    train_generator(netG_le, netD, optimizerG_le, None, g_le_costs, schedule[iters])
-
     for i in range(args.critic_iters):
-        train_energy(netG_he, netE, optimizerE, d_costs)
+        x_real = itr.__next__().cuda()
+
+        netE.zero_grad()
+        D_real = netE(x_real)
+        D_real = D_real.mean()
+        D_real.backward()
+
+        # train with fake
+        z = torch.randn(args.batch_size, args.z_dim).cuda()
+        x_fake = netG(z).detach()
+        D_fake = netE(x_fake)
+        D_fake = D_fake.mean()
+        (-D_fake).backward()
+
+        penalty = calc_penalty(netE, x_real, args.lamda)
+        penalty.backward()
+
+        optimizerE.step()
+        d_costs.append(
+            [D_real.item(), D_fake.item(), penalty.item()]
+        )
 
     if iters % 100 == 0:
         print('Train Iter: {}/{} ({:.0f}%)\t'
-              'Ent Coeff: {:.3f} D_costs: {} G_le_costs: {} G_he_costs: {} Time: {:5.3f}'.format(
+              'D_costs: {} G_costs: {} Time: {:5.3f}'.format(
                iters, args.iters, (100. * iters) / args.iters,
-               schedule[iters],
                np.asarray(d_costs)[-100:].mean(0),
-               np.asarray(g_le_costs)[-100:].mean(0),
-               np.asarray(g_he_costs)[-100:].mean(0),
+               np.asarray(g_costs)[-100:].mean(0),
                (time.time() - start_time) / 100
               ))
 
-        netG_le.eval()
-        netG_he.eval()
-        sample(netG_le, netG_he)
-        netG_le.train()
-        netG_he.train()
+        netG.eval()
+        sample(netG)
+        netG.train()
         start_time = time.time()
 
     if iters % 1000 == 0 and args.n_stack <= 3:
-        netG_le.eval()
+        netG.eval()
         print("-" * 100)
-        evals.count_modes(netG_le)
+        evals.count_modes(netG)
         print("-" * 100)
-        netG_le.train()
+        netG.train()
 
-        torch.save(netG_le.state_dict(), 'models/ebm_netG_MNIST_%d.pt' % args.n_stack)
+        torch.save(netG.state_dict(), 'models/ebm_netG_MNIST_%d.pt' % args.n_stack)
         torch.save(netE.state_dict(), 'models/ebm_netE_MNIST_%d.pt' % args.n_stack)

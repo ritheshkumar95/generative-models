@@ -2,6 +2,7 @@ import argparse
 import torch
 from tqdm import tqdm
 
+from data import inf_train_gen
 from torchvision.utils import save_image
 from modules import Discriminator, Generator
 from imageio import imread, mimwrite
@@ -15,7 +16,7 @@ def parse_args():
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
 
-    parser.add_argument('--lamda1', type=float, default=.001)
+    parser.add_argument('--lamda1', type=float, default=.01)
     parser.add_argument('--lamda2', type=float, default=.01)
     args = parser.parse_args()
     return args
@@ -23,15 +24,16 @@ def parse_args():
 
 args = parse_args()
 
-
+itr = inf_train_gen(args.n_points, n_stack=args.n_stack)
 netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
-netD = Discriminator(args.n_stack, args.dim).cuda()
+netE = Discriminator(args.n_stack, args.dim).cuda()
 
-netD.load_state_dict(torch.load('models/wgan-gp_netD_MNIST_%d.pt' % args.n_stack))
-netG.load_state_dict(torch.load('models/wgan-gp_netG_MNIST_%d.pt' % args.n_stack))
+netE.load_state_dict(torch.load('models/ebm_netE_MNIST_%d.pt' % args.n_stack))
+netG.load_state_dict(torch.load('models/ebm_netG_he_MNIST_%d.pt' % args.n_stack))
 
-# x = torch.zeros(args.n_points, args.n_stack, 28, 28).cuda()
-# x.data.uniform_(-1, 1)
+orig_x = itr.__next__().cuda()
+mask = torch.zeros_like(orig_x)
+mask[:, :, :14].data.fill_(1)
 
 z = torch.randn(args.n_points, args.z_dim).cuda()
 
@@ -39,8 +41,8 @@ images = []
 for i in tqdm(range(1, 101)):
     z.requires_grad_(True)
     x = netG(z)
-    # x.requires_grad_(True)
-    e_x = -netD(x)
+    x = x * (1 - mask) + orig_x * mask
+    e_x = netE(x)
 
     score = torch.autograd.grad(
         outputs=e_x, inputs=z,

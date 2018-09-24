@@ -7,6 +7,7 @@ from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, calc_gradient_penalty
 from data import inf_train_gen
+from eval import ModeCollapseEval
 
 
 def sample(netG, batch_size=64):
@@ -41,6 +42,7 @@ save_image(orig_data[:, :3], 'samples/orig_MNIST_%d.png' % args.n_stack)
 
 netG = Generator(args.n_stack, args.z_dim, args.dim).cuda()
 netD = Discriminator(args.n_stack, args.dim).cuda()
+evals = ModeCollapseEval(args.n_stack, args.z_dim)
 
 optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
@@ -101,6 +103,11 @@ for iters in range(1, args.iters + 1):
         wass_dist = []
         start_time = time.time()
 
-    if iters % 1000 == 0:
+    if iters % 1000 == 0 and args.n_stack <= 3:
+        netG.eval()
+        print("-" * 100)
+        evals.count_modes(netG)
+        print("-" * 100)
+        netG.train()
         torch.save(netG.state_dict(), 'models/wgan-gp_netG_MNIST_%d.pt' % args.n_stack)
         torch.save(netD.state_dict(), 'models/wgan-gp_netD_MNIST_%d.pt' % args.n_stack)
