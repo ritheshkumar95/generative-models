@@ -13,16 +13,16 @@ from eval import tf_inception_score
 
 
 def inf_train_gen(batch_size):
-    transf = transforms.Compose([
+    transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
     ])
+    data = datasets.ImageFolder('/Tmp/kumarrit/final_images', transform=transform)
     loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(
-            '../data/CIFAR10', train=True, download=True,
-            transform=transf
-        ), batch_size=64, drop_last=True
+        data, batch_size=batch_size, drop_last=True,
+        shuffle=True, num_workers=4
     )
+
     while True:
         for img, labels in loader:
             yield img
@@ -48,7 +48,7 @@ def parse_args():
 
 
 args = parse_args()
-args.dataset = 'CIFAR10'
+args.dataset = 'CelebA'
 itr = inf_train_gen(args.batch_size)
 
 #####################

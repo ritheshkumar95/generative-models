@@ -33,6 +33,9 @@ class Generator(nn.Module):
         self.expand = nn.Linear(z_dim, 4 * 4 * dim)
 
         self.main = nn.Sequential(
+            nn.ConvTranspose2d(dim, dim, 4, 2, 1),
+            nn.BatchNorm2d(dim),
+            nn.ReLU(True),
             nn.ConvTranspose2d(dim, dim // 2, 4, 2, 1),
             nn.BatchNorm2d(dim // 2),
             nn.ReLU(True),
@@ -68,6 +71,10 @@ class Discriminator(nn.Module):
             nn.Conv2d(dim // 2, dim // 2, 4, 2, 1),
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(dim // 2, dim, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim, dim, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim, dim, 3, 1, 1),
             nn.LeakyReLU(0.1, inplace=True)
         )
         self.expand = nn.Linear(4 * 4 * dim, 1)
@@ -94,6 +101,10 @@ class Classifier(nn.Module):
             nn.Conv2d(dim // 2, dim // 2, 4, 2, 1),
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(dim // 2, dim, 3, 1, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim, dim, 4, 2, 1),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(dim, dim, 3, 1, 1),
             nn.LeakyReLU(0.1, inplace=True)
         )
         self.expand = nn.Linear(4 * 4 * dim, z_dim)
