@@ -36,7 +36,18 @@ def calc_scores(netE):
     scores = []
     gts = []
     for i, (img, labels) in enumerate(itr):
-        scores += (-netE(img).squeeze()).detach().cpu().tolist()
+        img.requires_grad_(True)
+        e_x = netE(img)
+
+        score = torch.autograd.grad(
+            outputs=e_x, inputs=img,
+            grad_outputs=torch.ones_like(e_x),
+            only_inputs=True
+        )[0]
+        score = score.view(score.size(0), -1).norm(2, dim=-1) ** 2
+        scores += score.detach().cpu().tolist()
+
+        # scores += e_x.squeeze().detach().cpu().tolist()
         gts += labels.cpu().tolist()
 
     prc_auc = do_prc(scores, gts)
@@ -88,9 +99,9 @@ netG = Generator(1, args.z_dim, args.dim).cuda()
 netE = Discriminator(1, args.dim).cuda()
 netD = Classifier(1, args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
-optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
 
 start_time = time.time()
 d_costs = []
@@ -137,8 +148,7 @@ for iters in range(args.iters):
         D_real.backward()
 
         # train with fake
-        # z = torch.randn(args.batch_size, args.z_dim).cuda()
-        z = sample_negatives(args.n_mcmc_steps)
+        z = sample_negatives(args.mcmc_iters)
         x_fake = netG(z).detach()
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, average_precision_score, precision_recall_curve, auc
+from sklearn.metrics import precision_recall_fscore_support
 
 
 def do_prc(scores, true_labels, file_name='test', directory='results', plot=True):
@@ -16,6 +17,20 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
     Returns:
             prc_auc (float): area under the under the PRC curve
     """
+    per = np.percentile(scores, 70)
+
+    y_pred = scores.copy()
+    y_pred = np.array(y_pred)
+
+    inds = (y_pred < per)
+    inds_comp = (y_pred >= per)
+
+    y_pred[inds] = 0
+    y_pred[inds_comp] = 1
+
+    precision, recall, f1, _ = precision_recall_fscore_support(true_labels, y_pred, average='binary')
+    print("Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f " % (precision, recall, f1))
+
     precision, recall, thresholds = precision_recall_curve(true_labels, scores)
     prc_auc = auc(recall, precision)
     print("Mean precision: ", np.mean(precision))

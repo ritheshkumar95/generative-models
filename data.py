@@ -21,7 +21,7 @@ class MNIST(object):
 
         train_x = inlier_x[:-(n_inlier // 3)]
         test_inlier_x = inlier_x[-(n_inlier // 3):]
-        test_inlier_y = np.ones_like(inlier_y[-(n_inlier // 3):])
+        test_inlier_y = np.zeros_like(inlier_y[-(n_inlier // 3):])
 
         outlier_x = full_x[full_y != label]
         outlier_y = full_y[full_y != label]
@@ -33,7 +33,7 @@ class MNIST(object):
 
         n_test = test_inlier_x.shape[0] * 2
         test_outlier_x = outlier_x[:n_test]
-        test_outlier_y = np.zeros_like(outlier_y[:n_test])
+        test_outlier_y = np.ones_like(outlier_y[:n_test])
 
         self.dataset['train'] = train_x
         self.dataset['test'] = (
