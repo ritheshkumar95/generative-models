@@ -52,3 +52,20 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
         plt.close()
 
     return prc_auc
+
+
+def compute_precision_recall(scores, testy):
+    per = np.percentile(scores, 80)
+
+    y_pred = scores.copy()
+    y_pred = np.array(y_pred)
+
+    inds = (y_pred < per)
+    inds_comp = (y_pred >= per)
+
+    y_pred[inds] = 0
+    y_pred[inds_comp] = 1
+
+    precision, recall, f1, _ = precision_recall_fscore_support(testy, y_pred, average='binary')
+    print("Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f " % (precision, recall, f1))
+    return [precision, recall, f1]

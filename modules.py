@@ -99,6 +99,55 @@ class Classifier(nn.Module):
         return self.classify(out)
 
 
+class MLP_Generator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.main = nn.Sequential(
+            nn.Linear(32, 64),
+            nn.ReLU(True),
+            nn.Linear(64, 128),
+            nn.ReLU(True),
+            nn.Linear(128, 121)
+        )
+
+    def forward(self, z):
+        return self.main(z)
+
+
+class MLP_Discriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.main = nn.Sequential(
+            nn.Linear(121, 256),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(128, 128),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(128, 1)
+        )
+
+    def forward(self, z):
+        return self.main(z)
+
+
+class MLP_Classifier(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.main = nn.Sequential(
+            nn.Linear(121 + 32, 256),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(128, 128),
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Linear(128, 1)
+        )
+
+    def forward(self, x):
+        return self.main(x)
+
+
 if __name__ == '__main__':
     # netD = Discriminator().cuda()
     # print(netD(torch.randn(64, 1, 28, 28).cuda()).size())
