@@ -20,14 +20,13 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
     precision, recall, thresholds = precision_recall_curve(true_labels, scores)
     prc_auc = auc(recall, precision)
 
-    idx = (2 * precision * recall / (precision + recall)).argmax()
-    thresh = thresholds[idx]
+    scores = np.asarray(scores)
+    scores = (scores - scores.min()) / (scores.max() - scores.min())
+    thresh = 0.2
 
-    y_pred = scores.copy()
-    y_pred = np.array(y_pred)
-
-    inds = (y_pred < thresh)
-    inds_comp = (y_pred >= thresh)
+    y_pred = np.zeros_like(scores).astype('int')
+    inds = (scores < thresh)
+    inds_comp = (scores >= thresh)
 
     y_pred[inds] = 0
     y_pred[inds_comp] = 1

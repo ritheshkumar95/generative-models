@@ -13,6 +13,22 @@ from utils.evaluations import do_prc
 # import anomaly_data.mnist as data	
 
 
+def inf_train_gen(label, batch_size):
+    trainx, trainy = data.get_train(label, True)
+    while True:
+        for i in range(0, trainx.shape[0], batch_size):
+            x = torch.from_numpy(trainx[i:i + batch_size]).cuda()
+            yield x.squeeze()[:, None]
+
+
+def test_gen(label, batch_size):
+    testx, testy = data.get_test(label, True)
+    for i in range(0, testx.shape[0], batch_size):
+        x = torch.from_numpy(testx[i:i + batch_size]).cuda()
+        y = torch.from_numpy(testy[i:i + batch_size]).cuda()
+        yield x.squeeze()[:, None], y
+
+
 def sample_negatives(n_steps):
     z = torch.randn(args.batch_size, args.z_dim).cuda()
 
@@ -74,7 +90,7 @@ def parse_args():
 
     parser.add_argument('--mcmc_iters', type=int, default=0)
     parser.add_argument('--critic_iters', type=int, default=1)
-    parser.add_argument('--generator_iters', type=int, default=5)
+    parser.add_argument('--generator_iters', type=int, default=1)
     parser.add_argument('--lamda', type=float, default=10)
     parser.add_argument('--alpha', type=float, default=.01)
 
@@ -102,9 +118,9 @@ netG = Generator(1, args.z_dim, args.dim).cuda()
 netE = Discriminator(1, args.dim).cuda()
 netD = Classifier(1, args.z_dim, args.dim).cuda()
 
-optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
-optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.999), amsgrad=True)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
 start_time = time.time()
 d_costs = []
