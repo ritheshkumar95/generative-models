@@ -22,7 +22,7 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
 
     scores = np.asarray(scores)
     scores = (scores - scores.min()) / (scores.max() - scores.min())
-    thresh = 0.5
+    thresh = 0.2
 
     y_pred = np.zeros_like(scores).astype('int')
     inds = (scores < thresh)
