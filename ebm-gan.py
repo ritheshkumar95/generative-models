@@ -10,6 +10,7 @@ from modules import Generator, Discriminator, Classifier
 from modules import calc_penalty
 from data import MNIST
 from utils.evaluations import do_prc
+# import anomaly_data.mnist as data	
 
 
 def sample_negatives(n_steps):
@@ -33,6 +34,7 @@ def sample_negatives(n_steps):
 
 def calc_scores(netE):
     itr = dataset.test_gen(args.batch_size)
+    # itr = test_gen(args.label, args.batch_size)
     scores = []
     gts = []
     for i, (img, labels) in enumerate(itr):
@@ -85,6 +87,7 @@ def parse_args():
 args = parse_args()
 dataset = MNIST(args.label)
 itr = dataset.inf_train_gen(args.batch_size)
+# itr = inf_train_gen(args.label, args.batch_size)
 
 #####################
 # Dump Original Data

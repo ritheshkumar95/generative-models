@@ -8,11 +8,11 @@ class MNIST(object):
         self.dataset = {}
         data = np.load('anomaly_data/mnist.npz')
 
-        full_x = np.concatenate([data['x_train'], data['x_test'], data['x_valid']], axis=0)
-        full_y = np.concatenate([data['y_train'], data['y_test'], data['y_valid']], axis=0)
+        full_data = np.concatenate([data['x_train'], data['x_test'], data['x_valid']], axis=0)
+        full_label = np.concatenate([data['y_train'], data['y_test'], data['y_valid']], axis=0)
 
-        inlier_x = full_x[full_y == label]
-        inlier_y = full_y[full_y == label]
+        splits = {label: full_data[full_label == label] for label in range(10)}
+        
 
         n_inlier = inlier_x.shape[0]
         shuf = np.random.permutation(n_inlier)

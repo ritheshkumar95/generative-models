@@ -17,24 +17,24 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
     Returns:
             prc_auc (float): area under the under the PRC curve
     """
-    per = np.percentile(scores, 70)
+    precision, recall, thresholds = precision_recall_curve(true_labels, scores)
+    prc_auc = auc(recall, precision)
+
+    idx = (2 * precision * recall / (precision + recall)).argmax()
+    thresh = thresholds[idx]
 
     y_pred = scores.copy()
     y_pred = np.array(y_pred)
 
-    inds = (y_pred < per)
-    inds_comp = (y_pred >= per)
+    inds = (y_pred < thresh)
+    inds_comp = (y_pred >= thresh)
 
     y_pred[inds] = 0
     y_pred[inds_comp] = 1
+    mPrecision, mRecall, mF1, _ = precision_recall_fscore_support(true_labels, y_pred, average='binary')
 
-    precision, recall, f1, _ = precision_recall_fscore_support(true_labels, y_pred, average='binary')
-    print("Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f " % (precision, recall, f1))
+    print("Testing : Prec = %.4f | Rec = %.4f | F1 = %.4f " % (mPrecision, mRecall, mF1))
 
-    precision, recall, thresholds = precision_recall_curve(true_labels, scores)
-    prc_auc = auc(recall, precision)
-    print("Mean precision: ", np.mean(precision))
-    print("Mean recall: ", np.mean(recall))
 
     if plot:
         plt.figure()
