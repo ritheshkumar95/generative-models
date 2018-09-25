@@ -9,7 +9,7 @@ def inf_train_gen(batch_size, data_dir='../data/MNIST/raw', n_stack=3):
     mnist_X = loaded[16:].reshape((60000, 28, 28, 1)).astype(np.float)
     np.random.seed(111)
 
-    n_data = 128000 if n_stack == 3 else 10 ** n_stack
+    n_data = 128000 if n_stack == 3 else 26 ** n_stack
 
     ids = np.random.randint(
         0, mnist_X.shape[0],
