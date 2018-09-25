@@ -46,7 +46,7 @@ score = torch.autograd.grad(
 
 
 numerator = (score * eps).sum()
-denominator = args.sigma ** 2 * score.pow(2).sum()
+denominator = args.sigma * score.pow(2).sum()
 beta = (numerator / denominator).item()
 print(beta)
 

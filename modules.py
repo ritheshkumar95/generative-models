@@ -17,9 +17,9 @@ def calc_gradient_penalty(netD, real_data, fake_data, lamda=.1):
     return gradient_penalty
 
 
-def calc_penalty(netE, data, lamda):
+def calc_penalty(netE, data, lamda, beta=1.):
     data.requires_grad_(True)
-    energy = netE(data)
+    energy = netE(data) * beta
     score = torch.autograd.grad(
         outputs=energy, inputs=data,
         grad_outputs=torch.ones_like(energy),
