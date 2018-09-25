@@ -18,6 +18,8 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
     """
     precision, recall, thresholds = precision_recall_curve(true_labels, scores)
     prc_auc = auc(recall, precision)
+    print("Mean precision: ", np.mean(precision))
+    print("Mean recall: ", np.mean(recall))
 
     if plot:
         plt.figure()

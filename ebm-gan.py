@@ -7,29 +7,32 @@ import torch.nn as nn
 from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, Classifier
-from modules import calc_reconstruction
-import data.mnist as data
+from modules import calc_penalty
+from data import MNIST
 from utils.evaluations import do_prc
 
 
-def inf_train_gen(label, batch_size):
-    trainx, trainy = data.get_train(label, True)
-    while True:
-        for i in range(0, trainx.shape[0], batch_size):
-            x = torch.from_numpy(trainx[i:i + batch_size]).cuda()
-            yield x.squeeze()[:, None]
+def sample_negatives(n_steps):
+    z = torch.randn(args.batch_size, args.z_dim).cuda()
 
+    for i in range(n_steps):
+        z.requires_grad_(True)
+        x = netG(z)
+        e_x = netE(x)
 
-def test_gen(label, batch_size):
-    testx, testy = data.get_test(label, True)
-    for i in range(0, testx.shape[0], batch_size):
-        x = torch.from_numpy(testx[i:i + batch_size]).cuda()
-        y = torch.from_numpy(testy[i:i + batch_size]).cuda()
-        yield x.squeeze()[:, None], y
+        score = torch.autograd.grad(
+            outputs=e_x, inputs=z,
+            grad_outputs=torch.ones_like(e_x),
+            only_inputs=True
+        )[0]
+
+        noise = torch.randn_like(z) * np.sqrt(args.alpha * 2)
+        z = (z - args.alpha * score + noise).detach()
+    return z
 
 
 def calc_scores(netE):
-    itr = test_gen(args.label, args.batch_size)
+    itr = dataset.test_gen(args.batch_size)
     scores = []
     gts = []
     for i, (img, labels) in enumerate(itr):
@@ -52,12 +55,15 @@ def sample(netG, batch_size=64):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--label', type=int, default=1)
+
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iters', type=int, default=100000)
-    parser.add_argument('--critic_iters', type=int, default=5)
-    parser.add_argument('--sigma', type=float, default=.01)
-    parser.add_argument('--lamda', type=float, default=1)
-    parser.add_argument('--entropy_coeff', type=float, default=1)
+
+    parser.add_argument('--mcmc_iters', type=int, default=0)
+    parser.add_argument('--critic_iters', type=int, default=1)
+    parser.add_argument('--generator_iters', type=int, default=5)
+    parser.add_argument('--lamda', type=float, default=10)
+    parser.add_argument('--alpha', type=float, default=.01)
 
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--dim', type=int, default=512)
@@ -66,7 +72,8 @@ def parse_args():
 
 
 args = parse_args()
-itr = inf_train_gen(args.label, args.batch_size)
+dataset = MNIST(args.label)
+itr = dataset.inf_train_gen(args.batch_size)
 
 #####################
 # Dump Original Data
@@ -85,36 +92,41 @@ optimizerG = torch.optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
 optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
-one = torch.tensor(1., dtype=torch.float32).cuda()
-mone = one * -1
-
 start_time = time.time()
 d_costs = []
 g_costs = []
-for iters in range(1, args.iters + 1):
+for iters in range(args.iters):
     netG.zero_grad()
     netD.zero_grad()
 
-    z = torch.randn(args.batch_size, args.z_dim).cuda()
-    x_fake = netG(z)
-    D_fake = netE(x_fake)
-    D_fake = D_fake.mean()
-    D_fake.backward(one, retain_graph=True)
+    for i in range(args.generator_iters):
+        z = torch.randn(args.batch_size, args.z_dim).cuda()
+        x_fake = netG(z)
+        D_fake = netE(x_fake)
+        D_fake = D_fake.mean()
+        D_fake.backward(retain_graph=True)
 
-    x = netD(x_fake)
-    score = (z[:, None] * x[None]).sum(-1)
-    mi_estimate = args.entropy_coeff * nn.CrossEntropyLoss()(
-        score,
-        torch.arange(args.batch_size, dtype=torch.int64).cuda()
-    )
-    mi_estimate.backward()
+        ##########################################
+        # DeepInfoMAX for MI estimation
+        ##########################################
+        label = torch.zeros(2 * args.batch_size).cuda()
+        label[:args.batch_size].data.fill_(1)
 
-    optimizerG.step()
-    optimizerD.step()
+        z_bar = z[torch.randperm(args.batch_size)]
+        concat_x = torch.cat([x_fake, x_fake], 0)
+        concat_z = torch.cat([z, z_bar], 0)
+        mi_estimate = nn.BCEWithLogitsLoss()(
+            netD(concat_x, concat_z).squeeze(),
+            label
+        )
+        mi_estimate.backward()
 
-    g_costs.append(
-        [D_fake.item(), mi_estimate.item()]
-    )
+        optimizerG.step()
+        optimizerD.step()
+
+        g_costs.append(
+            [D_fake.item(), mi_estimate.item()]
+        )
 
     for i in range(args.critic_iters):
         x_real = itr.__next__()
@@ -122,24 +134,22 @@ for iters in range(1, args.iters + 1):
         netE.zero_grad()
         D_real = netE(x_real)
         D_real = D_real.mean()
-        D_real.backward(one)
+        D_real.backward()
 
         # train with fake
-        z = torch.randn(args.batch_size, args.z_dim).cuda()
+        # z = torch.randn(args.batch_size, args.z_dim).cuda()
+        z = sample_negatives(args.n_mcmc_steps)
         x_fake = netG(z).detach()
         D_fake = netE(x_fake)
         D_fake = D_fake.mean()
-        D_fake.backward(mone)
+        (-D_fake).backward()
 
-        score_matching_loss = args.lamda * nn.MSELoss()(
-            calc_reconstruction(netE, x_fake, args.sigma),
-            x_fake
-        )
-        score_matching_loss.backward()
+        penalty = calc_penalty(netE, x_real, args.lamda)
+        penalty.backward()
 
         optimizerE.step()
         d_costs.append(
-            [D_real.item(), D_fake.item(), score_matching_loss.item()]
+            [D_real.item(), D_fake.item(), penalty.item()]
         )
 
     if iters % 100 == 0:
