@@ -39,7 +39,7 @@ for j in tqdm(range(50)):
     for i in range(1, 1 + args.n_steps):
         z.requires_grad_(True)
         x = netG(z)
-        e_x = netD(x)
+        e_x = netD(x).squeeze()
 
         score = torch.autograd.grad(
             outputs=e_x, inputs=z,
@@ -51,12 +51,20 @@ for j in tqdm(range(50)):
         # direction = score / magnitude[:, None, None, None]
 
         noise = torch.randn_like(z) * np.sqrt(args.sigma * 2)
-        z = (z - args.sigma * score + noise).detach()
+        z_prop = (z - args.sigma * score + noise).detach()
 
-        # print("Energy: %f" % e_x.mean().item())
+        x_prop = netG(z_prop)
+        e_x_prop = netD(x_prop).squeeze()
+
+        ratio = (-e_x_prop + e_x).exp().clamp(max=1)
+        rnd_u = torch.rand(ratio.shape).cuda()
+        mask = (rnd_u < ratio).float()[:, None]
+        z = (z_prop * mask + z * (1 - mask)).detach()
+
+        print("Energy: %f" % e_x.mean().item())
 
         if args.v:
-            save_image(x, 'mcmc_samples/image_%05d.png' % i, normalize=True, nrow=10)
+            save_image(x, 'mcmc_samples/image_%05d.png' % i, normalize=True, nrow=int(args.n_points ** .5))
             images.append(imread('mcmc_samples/image_%05d.png' % i))
         else:
             x = netG(z)
