@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import argparse
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -8,7 +9,7 @@ from torchvision.utils import save_image
 
 from modules import Generator, Discriminator, Classifier
 from modules import calc_penalty
-# from data import MNIST
+from data import MNIST
 from utils.evaluations import do_prc
 import anomaly_data.mnist as data	
 
@@ -64,12 +65,11 @@ def calc_scores(netE):
         )[0]
         score = score.view(score.size(0), -1).norm(2, dim=-1) ** 2
         scores += score.detach().cpu().tolist()
-
-        # scores += e_x.squeeze().detach().cpu().tolist()
         gts += labels.cpu().tolist()
 
     prc_auc = do_prc(scores, gts)
     print('PRC AUC = %f' % prc_auc)
+    return prc_auc
 
 
 def sample(netG, batch_size=64):
@@ -86,10 +86,10 @@ def parse_args():
     parser.add_argument('--label', type=int, default=1)
 
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iters', type=int, default=100000)
+    parser.add_argument('--iters', type=int, default=20000)
 
     parser.add_argument('--mcmc_iters', type=int, default=0)
-    parser.add_argument('--critic_iters', type=int, default=1)
+    parser.add_argument('--critic_iters', type=int, default=5)
     parser.add_argument('--generator_iters', type=int, default=1)
     parser.add_argument('--lamda', type=float, default=10)
     parser.add_argument('--alpha', type=float, default=.01)
@@ -114,6 +114,7 @@ save_image(
     nrow=8, normalize=True
 )
 
+metrics = deque(maxlen=10)
 netG = Generator(1, args.z_dim, args.dim).cuda()
 netE = Discriminator(1, args.dim).cuda()
 netD = Classifier(1, args.z_dim, args.dim).cuda()
@@ -197,4 +198,8 @@ for iters in range(args.iters):
         start_time = time.time()
 
     if iters % 500 == 0:
-        calc_scores(netE)
+        auc = calc_scores(netE)
+        metrics.append(auc)
+        print("PRC AUC = mean: {} std: {}".format(
+            np.mean(metrics), np.std(metrics)
+        ))

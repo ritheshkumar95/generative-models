@@ -21,9 +21,7 @@ def do_prc(scores, true_labels, file_name='test', directory='results', plot=True
     prc_auc = auc(recall, precision)
 
     scores = np.asarray(scores)
-    scores = (scores - scores.min()) / (scores.max() - scores.min())
-    thresh = 0.2
-
+    thresh = np.percentile(scores, 70)
     y_pred = np.zeros_like(scores).astype('int')
     inds = (scores < thresh)
     inds_comp = (scores >= thresh)
