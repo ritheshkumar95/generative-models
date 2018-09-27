@@ -30,6 +30,9 @@ args = parse_args()
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
 
+netG.eval()
+netD.eval()
+
 netD.load_state_dict(torch.load('models/ebm_netE_CelebA.pt'))
 netG.load_state_dict(torch.load('models/ebm_netG_CelebA.pt'))
 
@@ -62,18 +65,27 @@ for j in tqdm(range(50)):
         z = (z_prop * mask + z * (1 - mask)).detach()
 
         print("Energy: %f" % e_x.mean().item())
+        x = netG(z)
 
         if args.v:
             save_image(x, 'mcmc_samples/image_%05d.png' % i, normalize=True, nrow=int(args.n_points ** .5))
             images.append(imread('mcmc_samples/image_%05d.png' % i))
+            # x = netG(z).detach().cpu()
+            # images.append(x)
         else:
             x = netG(z)
             images.append(x.detach().cpu().numpy())
-    
+
     if args.v:
         mimwrite('mcmc.gif', images)
         break
 
+
+# images = torch.stack([x for i, x in enumerate(images) if i % 3 == 0], 1)
+# print(images.shape[0])
+# images = images.view(-1, 3, 64, 64)
+# save_image(images, './large_celeba.png', normalize=True, nrow=images.size(0)//2)
+# import ipdb; ipdb.set_trace()
 
 if not args.v:
     all_samples = np.concatenate(images, axis=0)
