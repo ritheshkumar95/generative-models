@@ -161,6 +161,9 @@ for iters in range(args.iters):
 
     for i in range(args.critic_iters):
         x_real = itr.__next__()
+        while x_real.dim() != 4:
+            print("Skipping bad batch!")
+            x_real = itr.__next__()
 
         netE.zero_grad()
         D_real = netE(x_real)
