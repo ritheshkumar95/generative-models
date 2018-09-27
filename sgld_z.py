@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument('--dim', type=int, default=512)
 
     parser.add_argument('--sigma', type=float, default=.01)
+    parser.add_argument('--temp', type=float, default=.01)
     args = parser.parse_args()
     return args
 
@@ -44,7 +45,6 @@ img_tensors = []
 
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
-z = torch.randn(args.n_points, args.z_dim).cuda()
 for i in range(1, 1 + args.n_steps):
     img_tensors.append(x.detach().cpu())
     save_image(
@@ -55,7 +55,7 @@ for i in range(1, 1 + args.n_steps):
 
     z.requires_grad_(True)
     x = netG(z)
-    e_x = netD(x).squeeze()
+    e_x = netD(x).squeeze() * args.temp
 
     score = torch.autograd.grad(
         outputs=e_x, inputs=z,
@@ -67,14 +67,14 @@ for i in range(1, 1 + args.n_steps):
     z_prop = (z - args.sigma * score + noise).detach()
 
     x_prop = netG(z_prop)
-    e_x_prop = netD(x_prop).squeeze()
+    e_x_prop = netD(x_prop).squeeze() * args.temp
 
     ratio = (-e_x_prop + e_x).exp().clamp(max=1)
     rnd_u = torch.rand(ratio.shape).cuda()
     mask = (rnd_u < ratio).float()[:, None]
     z = (z_prop * mask + z * (1 - mask)).detach()
 
-    print("Energy: %f" % e_x.mean().item())
+    print("Ratio: %f Energy: %f" % (ratio.mean().item(), e_x.mean().item()))
     x = netG(z)
 
 

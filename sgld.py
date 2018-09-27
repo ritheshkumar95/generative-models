@@ -51,10 +51,10 @@ for j in tqdm(range(50)):
         )[0]
 
         # magnitude = score.view(score.size(0), -1).norm(2, dim=-1)
-        # direction = score / magnitude[:, None, None, None]
+        # direction = score / magnitude[:, None]
 
         noise = torch.randn_like(z) * np.sqrt(args.sigma * 2)
-        z_prop = (z - args.sigma * score + noise).detach()
+        z_prop = (z - args.sigma * direction + noise).detach()
 
         x_prop = netG(z_prop)
         e_x_prop = netD(x_prop).squeeze()
