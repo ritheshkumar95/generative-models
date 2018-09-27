@@ -30,8 +30,8 @@ args = parse_args()
 netG = Generator(args.z_dim, args.dim).cuda()
 netD = Discriminator(args.dim).cuda()
 
-netD.load_state_dict(torch.load('models/ebm_netE_CIFAR10.pt'))
-netG.load_state_dict(torch.load('models/ebm_netG_CIFAR10.pt'))
+netD.load_state_dict(torch.load('../logs/ebm_CIFAR/models/netE.pt'))
+netG.load_state_dict(torch.load('../logs/ebm_CIFAR/models/netG.pt'))
 
 images = []
 for j in tqdm(range(50)):
@@ -56,11 +56,11 @@ for j in tqdm(range(50)):
         # print("Energy: %f" % e_x.mean().item())
 
         if args.v:
-            save_image(x, 'mcmc_samples/image_%05d.png' % i, normalize=True, nrow=10)
+            save_image(x, 'mcmc_samples/image_%05d.png' % i, normalize=True, nrow=4)
             images.append(imread('mcmc_samples/image_%05d.png' % i))
-
-    x = netG(z)
-    images.append(x.detach().cpu().numpy())
+        else:
+            x = netG(z)
+            images.append(x.detach().cpu().numpy())
     if args.v:
         mimwrite('mcmc.gif', images)
         break
